@@ -5,7 +5,7 @@ Keep it current: one row per note.
 
 | File | Topic | Phase | Status | Date |
 |------|-------|-------|--------|------|
-| _(none yet)_ | | | | |
+| `findings/2026-10-25-rea-agents.md` | rea / rea-agents — agent-driven RE MCP (P0 `disasm-mcp`+`agentic-re`) | research | draft (needs Evaluator) | 2026-10-25 |
 
 ## Conventions
 - One note per topic, named `findings/YYYY-MM-DD-<slug>.md`.
