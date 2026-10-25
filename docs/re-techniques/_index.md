@@ -51,9 +51,25 @@ hardening on top.
 | `ai-frida-gen` | AI agents that generate Frida hooks/instrumentation from a prompt ("hook the license check"). Turns "write a hook" into one sentence. | Frida | A+B | list (verify in research) |
 | `mobile-ai-re` | LLM plugins/agents over JADX / APK analysis and iOS equivalents — "explain this app, find the check." | JADX / APKTool / iOS tooling | B | list (verify in research) |
 | `ai-deobfuscators` | LLM-driven deobfuscation & symbol/name recovery (humanify-class, AI string/control-flow recovery). Undoes the cheap obfuscation layer. | — (model) | A+B | list (verify in research) |
+| `uncensored-local-models` | **The model layer.** Open-weight / abliterated / "uncensored" models run locally (GLM-4.x/5.x-class, Qwen-class, DeepSeek-class, Llama-abliterated, dolphin/hermes-uncensored) via Ollama / LM Studio / llama.cpp / vLLM — chosen specifically to strip the vendor **refusal gate, rate limits, and logging** out of the RE loop. Powers every row above when a hosted model would decline. | is the brain behind every P0 row | A+B | list (verify in research) |
+| `ai-crack-as-a-service` | AI-backed crack / keygen / patch "services": Discord & Telegram bots, web SaaS, shared agent skills that hand a finished crack to someone who never opens a tool. The **distribution layer** that makes cracks "public." | `agentic-re` + uncensored models | A+B | list (verify in research) |
+| `ai-cheat-gen` | AI that generates game cheats / trainers / memory patches from a prompt (games specifically). | `memory-scan` / Frida + model | A+B | list (verify in research) |
 
-**Next phase:** research + analysis on these P0 entries, highest-impact first
-(`disasm-mcp` and `agentic-re` lead). Each gets its own `docs/re-techniques/<slug>.md`.
+### The three layers (how to read the table)
+P0 is not one tool — it's a **stack**, and we can attack any layer:
+1. **Model layer** — what reasons (`uncensored-local-models`). *Defensive
+   consequence: assume a fully cooperative, unrestricted model. "The AI will
+   refuse" is NOT a defense.*
+2. **Tooling layer** — what acts on the binary (`disasm-mcp`, `agentic-re`,
+   `ai-frida-gen`, `decompiler-gpt-plugins`, `llm-decompile-models`,
+   `mobile-ai-re`, `ai-deobfuscators`).
+3. **Distribution layer** — how a finished crack reaches non-experts
+   (`ai-crack-as-a-service`).
+
+**Next phase:** research + analysis on these P0 entries, highest-impact first.
+Leads: `disasm-mcp` and `agentic-re` (tooling), `uncensored-local-models`
+(because it invalidates the lazy "model refuses" assumption). Each gets its own
+`docs/re-techniques/<slug>.md`.
 
 ## Substrate — classic engines the P0 tools drive (secondary)
 

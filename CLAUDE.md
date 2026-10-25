@@ -76,6 +76,15 @@ fronts:
    working tamper, watermarking to attribute AI-generated cracks). This is where
    the project earns its novelty.
 
+**Hard assumption — the model is hostile and unrestricted.** Attackers don't use
+the refusing hosted models; they run open-weight / abliterated / uncensored
+models locally (GLM-4.x/5.x-class, Qwen, DeepSeek, Llama-abliterated,
+dolphin/hermes) with no refusal gate, no rate limit, and no logging. So **"the AI
+will refuse to crack it" is NOT a defense** and nothing we build may rely on it.
+P0 is a three-layer stack — *model* (what reasons) → *tooling* (what acts on the
+binary) → *distribution* (crack-as-a-service that reaches non-experts) — and we
+may attack any layer. See the P0 table in `docs/re-techniques/_index.md`.
+
 The P0 catalog (AI-assisted tooling) is enumerated and tracked in
 `docs/re-techniques/_index.md`. We defend our own build against it — we never
 build or document how to crack any specific third-party product.

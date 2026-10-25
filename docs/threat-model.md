@@ -11,11 +11,18 @@ or anti-tamper logic, proprietary algorithms).
 
 ## Who the adversary is
 An analyst with physical/local access to a shipped build and standard RE
-tooling (see `re-techniques/_index.md`). We assume the adversary:
+tooling (see `re-techniques/_index.md`) — increasingly a **non-expert driving an
+AI agent** rather than a skilled reverser. We assume the adversary:
 - Can run the app in a controlled environment they fully own.
 - Can read every byte we ship. **Anything in the client is readable.**
 - Can attach debuggers, instrument with Frida, dump memory, patch binaries.
 - Has unlimited time and can retry. Our goal is to **raise cost**, not to win.
+- **Drives a fully cooperative, unrestricted LLM.** They use open-weight /
+  abliterated / uncensored models run locally (no refusals, no rate limits, no
+  logging), so model-vendor safety is *not* a layer we can count on. Design as
+  if the AI will do anything the attacker asks.
+- Needs little skill: AI tooling (disassembler MCP servers, autonomous RE
+  agents, crack-as-a-service) does the reversing from a one-sentence prompt.
 
 ## The one law of client-side protection
 > You cannot keep a secret in software you give to the attacker.
