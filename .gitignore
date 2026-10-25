@@ -1,0 +1,29 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Node / build (harness & skill tooling may use these)
+node_modules/
+dist/
+build/
+*.log
+.env
+.env.*
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Local scratch — never commit raw target binaries or dumps
+scratch/
+samples/
+*.dump
+*.bin.local
+
+# Session state (ephemeral agent bookkeeping)
+research/findings/_session-state.md
