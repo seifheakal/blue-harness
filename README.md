@@ -10,9 +10,16 @@
 
 ## What this is
 
-Shipped applications get reverse-engineered every day: decompiled in Ghidra/IDA,
-hooked live with Frida, unpacked, memory-scanned, repacked. **Carapace** is a
-*defensive* toolkit that helps you fight back on **your own builds**:
+Reverse engineering used to take real skill — Ghidra, IDA, Frida, years of
+practice. Not anymore. Today anyone can install an AI skill or MCP server, point
+an LLM agent at a binary or an app, type **one sentence**, and get back readable
+code, a patch, or a working hook. The skill floor collapsed, and commodity
+cracking of shipped software — games, creative suites, office apps — exploded
+with it.
+
+**Carapace** is a *defensive* toolkit aimed squarely at that new threat: it
+helps you make **your own builds** expensive to reverse, including **against
+AI-driven, one-command RE** — not just the classic tools those agents drive.
 
 - **Audit** — scan a build and get a scored report of how exposed it is to the
   common RE workflows (decompilation, dynamic instrumentation, memory
@@ -34,6 +41,12 @@ Two tracks:
 |-------|---------|-------------------------------|
 | **A — Native binaries** | ELF / PE / Mach-O (C / C++ / Rust / Go) | Frida, Ghidra/IDA, GDB/LLDB/x64dbg, Cheat Engine |
 | **B — Mobile** | Android (APK/AAB, Dalvik + JNI `.so`), iOS (Mach-O) | Frida/objection, JADX/APKTool, Magisk/Xposed, SSL-pinning bypass, iOS decrypt |
+
+**Priority 0 across both tracks:** the AI-assisted tooling that drives those
+engines from a single prompt — disassembler MCP servers (GhidraMCP, IDA/r2 MCP),
+autonomous RE agents, LLM decompilers, AI Frida-hook generators. That's the
+headline threat; the classic tools are the substrate it rides on. See
+[`docs/re-techniques/_index.md`](docs/re-techniques/_index.md).
 
 Electron / web / JS / WebAssembly / pure-.NET are out of current scope.
 

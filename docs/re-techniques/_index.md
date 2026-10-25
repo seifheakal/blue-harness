@@ -29,27 +29,53 @@ Every `docs/re-techniques/<slug>.md` uses this structure:
 - <cited, dated>
 ```
 
-## Catalog status — in scope (native binaries + mobile)
+## ⚠️ Priority 0 — AI-assisted / commodity RE (the headline threat)
+
+The skill-floor collapse: a non-expert drives these from **one sentence** and an
+LLM does the reversing. This is the project's core focus (see `CLAUDE.md` §2).
+Almost all of them **sit on top of** a classic engine (the Substrate table
+below) — so defeating the substrate blinds the AI, *and* we research AI-specific
+hardening on top.
+
+> Assembled from knowledge as of the model's cutoff — **not yet web-verified**.
+> Status `list (verify in research)` = named here so research can confirm,
+> date, and detail it. The RE-AI space moves monthly; treat every name as a
+> lead, not a citation, until a Scout note backs it.
+
+| Slug | AI-assisted threat | Typically drives (substrate) | Track | Status |
+|------|--------------------|------------------------------|-------|--------|
+| `disasm-mcp` | MCP servers exposing a disassembler to an LLM agent (GhidraMCP, IDA-Pro-MCP, r2mcp, Binary Ninja MCP). The archetypal "install a skill, one sentence, you're in." | Ghidra / IDA / radare2 / Binja | A (+native .so in B) | list (verify in research) |
+| `agentic-re` | End-to-end autonomous RE agents that chain a disasm-MCP + LLM + patching into a goal loop ("find and remove the trial check"). The fully-automated endpoint of P0. | all of the above | A+B | list (verify in research) |
+| `decompiler-gpt-plugins` | In-tool LLM assistants: Gepetto (IDA), aiDAPal, GhidraGPT/GptHidra/ReVa, r2ai — one-click explain/rename/summarize of decompiled functions. | IDA / Ghidra / radare2 | A | list (verify in research) |
+| `llm-decompile-models` | Models that turn stripped binaries/assembly into readable C from a prompt (LLM4Decompile-class, DeGPT for readability). Skip the human analyst entirely. | — (model) | A | list (verify in research) |
+| `ai-frida-gen` | AI agents that generate Frida hooks/instrumentation from a prompt ("hook the license check"). Turns "write a hook" into one sentence. | Frida | A+B | list (verify in research) |
+| `mobile-ai-re` | LLM plugins/agents over JADX / APK analysis and iOS equivalents — "explain this app, find the check." | JADX / APKTool / iOS tooling | B | list (verify in research) |
+| `ai-deobfuscators` | LLM-driven deobfuscation & symbol/name recovery (humanify-class, AI string/control-flow recovery). Undoes the cheap obfuscation layer. | — (model) | A+B | list (verify in research) |
+
+**Next phase:** research + analysis on these P0 entries, highest-impact first
+(`disasm-mcp` and `agentic-re` lead). Each gets its own `docs/re-techniques/<slug>.md`.
+
+## Substrate — classic engines the P0 tools drive (secondary)
+
+Old, skill-heavy, already-handled-by-the-industry. We track them because the P0
+tools orchestrate them and because defeating them blinds the AI on top.
 
 | Slug | Tool / Technique | Track | Category | Priority | Status |
 |------|------------------|-------|----------|----------|--------|
-| `frida` | Frida (+ objection) runtime hooking | A+B | dynamic | ⭐ P1 | todo |
-| `ghidra` | Ghidra decompiler | A | static | ⭐ P1 | todo |
-| `debuggers` | GDB / LLDB / x64dbg / WinDbg | A | dynamic | P1 | todo |
-| `ida` | IDA Pro / Hex-Rays | A | static | P1 | todo |
-| `jadx-apktool` | JADX / APKTool (Android dex) | B | mobile | ⭐ P1 | todo |
-| `android-root-hook` | Magisk / Zygisk / Xposed / LSPosed | B | mobile | P1 | todo |
-| `ios-decrypt` | class-dump / app decrypt / Hopper (iOS) | B | mobile | P1 | todo |
+| `frida` | Frida (+ objection) runtime hooking | A+B | dynamic | P1 | todo |
+| `ghidra` | Ghidra decompiler | A | static | P1 | todo |
+| `debuggers` | GDB / LLDB / x64dbg / WinDbg | A | dynamic | P2 | todo |
+| `ida` | IDA Pro / Hex-Rays | A | static | P2 | todo |
+| `jadx-apktool` | JADX / APKTool (Android dex) | B | mobile | P1 | todo |
+| `android-root-hook` | Magisk / Zygisk / Xposed / LSPosed | B | mobile | P2 | todo |
+| `ios-decrypt` | class-dump / app decrypt / Hopper (iOS) | B | mobile | P2 | todo |
 | `memory-scan` | Cheat Engine / GameGuardian / mem edit | A+B | dynamic | P2 | todo |
-| `ssl-pinning-bypass` | SSL-pinning bypass (Frida/objection) | B | network | P2 | todo |
-| `radare2` | radare2 / rizin / Cutter | A | static | P2 | todo |
-| `binja` | Binary Ninja | A | static | P3 | todo |
-| `emulation` | QEMU / Unicorn / angr (symbolic) | A | dynamic | P3 | todo |
+| `ssl-pinning-bypass` | SSL-pinning bypass (Frida/objection) | B | network | P3 | todo |
+| `radare2` | radare2 / rizin / Cutter | A | static | P3 | todo |
 | `packers` | UPX / PyInstaller unpacking | A | packaging | P3 | todo |
-| `ai-assisted-re` | LLM-assisted decompilation / deobfuscation | A+B | ai-assisted | P2 | todo |
 
 **Track A** = native binaries (ELF/PE/Mach-O). **Track B** = mobile (Android/iOS).
-**Priority** = relevance to the confirmed target. ⭐ = start here.
+The substrate is P1/P2 only because the P0 AI tools ride on it — not a headline in itself.
 
 ## Out of current scope (reference only — do not work unless target changes)
 `electron-asar`, `js-deobf`, `wasm-decompile`, `dotnet-decompile`. Kept for

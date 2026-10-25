@@ -53,7 +53,34 @@ This is our research focus. We study these so we can defend against them — we
 analyze each tool's **workflow steps** and map a countermeasure to each step.
 Keep this list current; it is the heart of the project.
 
-### Track A — Native binaries
+### ⚠️ Priority 0 — AI-assisted / commodity RE (the headline threat)
+
+**This is the whole point of the project.** The classic tools below (Ghidra,
+IDA, Frida, JADX) are decades old, demand real skill, and never put reversing
+in reach of the average person. What changed — and what we exist to counter —
+is the **collapse of the skill floor**: a non-expert now installs an AI skill /
+agent / MCP server, points it at a binary or app, types **one sentence**, and an
+LLM drives the disassembler/instrumentation and returns readable code, a patch,
+or a working hook. That is why commodity cracking of shipped software is
+exploding. Defending against *this* is P0; everything else is secondary.
+
+Key insight for our defenses: these tools almost always **sit on top of** the
+classic engines (an LLM orchestrating Ghidra/radare2/Frida). So two defensive
+fronts:
+1. **Break the substrate** — defeat the underlying decompiler/instrumentation and
+   you also blind the AI riding on it (the classic countermeasures still pay off).
+2. **Break the AI layer specifically** — the novel research angle: hardening that
+   is cheap for a machine to run but **degrades LLM comprehension and agentic
+   automation** (context-window exhaustion, semantic-confusion transforms,
+   anti-headless/anti-automation signals, attestation so understanding ≠ a
+   working tamper, watermarking to attribute AI-generated cracks). This is where
+   the project earns its novelty.
+
+The P0 catalog (AI-assisted tooling) is enumerated and tracked in
+`docs/re-techniques/_index.md`. We defend our own build against it — we never
+build or document how to crack any specific third-party product.
+
+### Track A — Native binaries (the substrate the AI tools drive)
 **Static analysis / decompilation**
 - Ghidra, IDA Pro / IDA Free + Hex-Rays, Binary Ninja, radare2 / rizin + Cutter
 - objdump / readelf / nm / strings; symbolic & automated: angr, RetDec
@@ -78,8 +105,8 @@ Keep this list current; it is the heart of the project.
 - class-dump, Frida, app decryption (clutch-style), Hopper, Cycript
 
 ### Cross-cutting
-- **AI-assisted RE (rising fast — track it):** LLM-assisted decompiler
-  explanation, automated deobfuscation, RE "copilots".
+- **AI-assisted RE** is **P0**, not cross-cutting — see the Priority 0 section
+  above and the P0 table in `docs/re-techniques/_index.md`.
 - **Network / protocol** (secondary): mitmproxy, Burp Suite, Wireshark, Charles.
 
 > For each in-scope entry there is (or will be) a file in `docs/re-techniques/`
