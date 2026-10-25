@@ -6,6 +6,7 @@ Keep it current: one row per note.
 | File | Topic | Phase | Status | Date |
 |------|-------|-------|--------|------|
 | `findings/2026-10-25-rea-agents.md` | rea / rea-agents — agent-driven RE MCP (P0 `disasm-mcp`+`agentic-re`) | research | draft (needs Evaluator) | 2026-10-25 |
+| `findings/2026-10-25-rea-weapons-inventory.md` | rea — per-capability weapons inventory (tools, surfaces, engines, target requirements, runtime-capture path, turnkey severity, popularity, deps/OS; Frida present, PTY path not ptrace) | research | draft (needs Evaluator) | 2026-10-25 |
 
 ## Conventions
 - One note per topic, named `findings/YYYY-MM-DD-<slug>.md`.

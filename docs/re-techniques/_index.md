@@ -44,8 +44,8 @@ hardening on top.
 
 | Slug | AI-assisted threat | Typically drives (substrate) | Track | Status |
 |------|--------------------|------------------------------|-------|--------|
-| `disasm-mcp` | MCP servers exposing a disassembler to an LLM agent (GhidraMCP, IDA-Pro-MCP, r2mcp, Binary Ninja MCP). The archetypal "install a skill, one sentence, you're in." | Ghidra / IDA / radare2 / Binja | A (+native .so in B) | list (verify in research) |
-| `agentic-re` | End-to-end autonomous RE agents that chain a disasm-MCP + LLM + patching into a goal loop ("find and remove the trial check"). The fully-automated endpoint of P0. | all of the above | A+B | list (verify in research) |
+| `disasm-mcp` | MCP servers exposing a disassembler to an LLM agent (GhidraMCP, IDA-Pro-MCP, r2mcp, Binary Ninja MCP). The archetypal "install a skill, one sentence, you're in." | Ghidra / IDA / radare2 / Binja | A (+native .so in B) | **analysis** → worked ref: [`rea.md`](rea.md) |
+| `agentic-re` | End-to-end autonomous RE agents that chain a disasm-MCP + LLM into a goal loop ("find & understand the trial check"). The fully-automated endpoint of P0. | all of the above | A+B | **analysis** → worked ref: [`rea.md`](rea.md) |
 | `decompiler-gpt-plugins` | In-tool LLM assistants: Gepetto (IDA), aiDAPal, GhidraGPT/GptHidra/ReVa, r2ai — one-click explain/rename/summarize of decompiled functions. | IDA / Ghidra / radare2 | A | list (verify in research) |
 | `llm-decompile-models` | Models that turn stripped binaries/assembly into readable C from a prompt (LLM4Decompile-class, DeGPT for readability). Skip the human analyst entirely. | — (model) | A | list (verify in research) |
 | `ai-frida-gen` | AI agents that generate Frida hooks/instrumentation from a prompt ("hook the license check"). Turns "write a hook" into one sentence. | Frida | A+B | list (verify in research) |
