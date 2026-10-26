@@ -36,6 +36,13 @@ static int compute_checksum(const char *s)
     return acc;
 }
 
+/* An internal, non-user-facing tag — exactly the kind of label the identity
+ * transform's string-decoy pass targets (Slice B). It is folded into a volatile
+ * sink below and NEVER printed, so a same-length decoy swap is invisible to
+ * program output. The verify step enforces that invisibility. */
+static const char INTERNAL_BUILD_TAG[] = "build:prod-eu-signing-slot-03";
+volatile int carapace_tag_sink;
+
 static void print_dumpstate(void)
 {
     int dumpable = prctl(PR_GET_DUMPABLE, 0, 0, 0, 0);
@@ -85,6 +92,9 @@ int main(int argc, char **argv)
     /* default: do a little real work so the binary isn't empty */
     const char *banner = "Carapace sample app: licensed build, do not redistribute";
     int sum = 0;
+    /* reference the internal tag so the linker keeps it, without affecting any
+     * observable output (never printed) — a sound target for a decoy swap. */
+    carapace_tag_sink = compute_checksum(INTERNAL_BUILD_TAG);
     for (int i = 0; i < 1000; ++i)
         sum += compute_checksum(banner) % (i + 1);
     printf("sample: ran OK (work=%d)\n", sum);

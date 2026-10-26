@@ -17,6 +17,11 @@ all: sample_baseline sample_hardened
 sample_baseline: sample_app.c
 	$(CC) $(CFLAGS) $(INCLUDE) -o $@ sample_app.c
 
+# Clean dev artifact (unstripped, with symbols) consumed by the Slice B identity
+# transform. Built on demand (`make sample_dev`), not part of `all`.
+sample_dev: sample_app.c
+	$(CC) $(CFLAGS) $(INCLUDE) -o $@ sample_app.c
+
 # Hardened: same source + the guard TU, with CARAPACE_HARDENED calling the init.
 # Audit should report both guards PRESENT (symbols setrlimit/prctl/ptrace +
 # the "/proc/self/status","TracerPid" strings are now referenced).
@@ -25,4 +30,4 @@ sample_hardened: sample_app.c $(HARDEN)/carapace_guards.c $(HARDEN)/carapace_gua
 		sample_app.c $(HARDEN)/carapace_guards.c
 
 clean:
-	rm -f sample_baseline sample_hardened
+	rm -f sample_baseline sample_hardened sample_dev sample_release_*

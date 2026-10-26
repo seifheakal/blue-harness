@@ -35,3 +35,5 @@ harness/verify/ptrace_attach_probe
 # Core dumps left by the verify harness control case
 core
 core.*
+harness/sample/sample_dev
+harness/sample/sample_release_*

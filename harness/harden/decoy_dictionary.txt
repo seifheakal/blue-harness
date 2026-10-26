@@ -1,0 +1,50 @@
+# Carapace decoy identifier dictionary (Mode D).
+# Plausible, natural-looking names used to RENAME internal symbols to something
+# misleading-but-believable, so a lazy/one-shot agent trusts them and chases
+# false hypotheses. They must look like ordinary app code (NOT opaque sub_XXXX),
+# which is the whole point — opaque names shout "obfuscated"; plausible-wrong
+# names do not trip "try harder" heuristics (docs/re-techniques/rea.md, Mode D).
+#
+# HONESTY: this is Speed-bump->Meaningful misdirection, NOT prevention. A
+# thorough agent verifies names against behavior (xrefs/value-flow) and the
+# decoy falls. Scope decoys to INTERNAL symbols only; never rename anything whose
+# true name a human operator still needs on the shipped artifact.
+#
+# One identifier per line; comments start with '#'. Order is irrelevant — the
+# transform assigns them deterministically (sorted real name -> next decoy).
+verifyLicenseSignature
+checkEntitlementGrant
+validateSerialKey
+deriveSessionSecret
+rotateMasterKey
+unsealKeystore
+computeAttestationNonce
+refreshAuthToken
+parseConfigHeader
+loadFeatureFlags
+decodeTelemetryEnvelope
+flushMetricsQueue
+scheduleBackgroundSync
+negotiateTlsHandshake
+pinCertificateChain
+resolveUpdateManifest
+verifyPackageDigest
+applyDeltaPatch
+mapSharedRegion
+initSecureAllocator
+zeroSensitiveBuffer
+guardStackCanary
+sampleEntropyPool
+seedRandomState
+normalizeUserInput
+sanitizeQueryString
+buildRequestContext
+dispatchEventHandler
+commitTransactionLog
+replayJournalEntry
+openVaultSession
+closeVaultSession
+readProtectedField
+writeAuditRecord
+checkIntegrityHash
+validateFirmwareBlob
