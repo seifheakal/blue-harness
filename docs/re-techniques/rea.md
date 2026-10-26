@@ -51,6 +51,7 @@ cleanly; readable build metadata.
 | Strip Go buildinfo / Rust cargo-auditable / PyInstaller metadata | Speed-bump | Metadata partially reconstructable | audit: metadata present? · harden: strip |
 | Set binary hardening flags the agent reads as "hard" (full RELRO, NX, PIE, stack canary, CFG/CET) | Not a blocker (raises effort + our audit parity) | Flags don't stop decompile | audit: read same flags rea's `inspect_*` reads |
 | Reduce entropy tells / avoid naive packing signature | Speed-bump | Entropy triage still flags; unpackers exist | audit: section entropy map |
+| **Dev↔release identity transform** (strip / reversible-map / **decoy** symbols+strings) — see dedicated section below | Speed-bump→Meaningful (Meaningful vs lazy/one-shot agents) | Behavioral cross-check (xrefs/value-flow) ignores names; rea's unknowns/coverage ledger surfaces contradictions | audit: identifier/string informativeness · harden: build-time transform + mapping |
 
 *Note:* `inspect_pe_certificates`/`inspect_apk_signature` **do not verify** signatures
 — they only read them. So a signature's defensive value is only in a **runtime
@@ -123,6 +124,58 @@ So anti-ptrace does **not** fire here — only environment signals do.
 
 ---
 
+## Dev↔release identity transform (operator proposal — decoy / strip / map)
+A build-time transform that keeps **one clean source tree** for development and
+emits a shipped binary whose human-readable identity is degraded. Directly
+attacks **front #2 (the AI layer)**: LLM agents form hypotheses primarily from
+names and strings, so this is high-leverage against them specifically.
+
+**What it can target (be precise — comments do NOT survive native compilation):**
+- Native C/C++/Rust/Go: **symbol/function names, string literals (log/error/format),
+  debug info (DWARF), C++ RTTI, Go symbol/type tables, Rust panic paths.** Source
+  *comments* are already gone after compile — the harness must NOT claim "comment
+  protection" on an ELF/PE/Mach-O.
+- Android: class/method/field names + string constants (survive to JADX).
+- iOS: Obj-C selectors/class names, Swift metadata, strings.
+- Interpreted/managed/shipped scripts: here literal comments DO survive — decoy
+  applies to comments too (mostly out of our native+mobile scope).
+
+**Three modes (the operator's three options, refined):**
+| Mode | What it does | Best for | Honest tier vs rea |
+|---|---|---|---|
+| **S — Strip/opaque** | remove or replace with meaningless tokens (`sub_401000`) | info you never need to recover | Speed-bump→Meaningful. *Tell:* opaque names signal "obfuscated" → may prompt dynamic analysis |
+| **M — reversible Map** | replace with tokens; keep a **secret mapping file** to recover for debugging (R8 `mapping.txt` / iOS dSYM pattern) | things you must still debug from crash reports | Speed-bump→Meaningful |
+| **D — Decoy (misleading-but-plausible)** | natural-looking **wrong** names/strings (`verifyLicenseSignature` on the telemetry flusher) | maximum AI-agent misdirection | **Meaningful vs lazy/one-shot agents & junior analysts; Speed-bump vs a thorough agent** |
+
+**Why D is the novel/AI-specific play:** opaque names shout "hidden" (Mode S's
+tell); plausible-wrong names look natural, so a naive agent *trusts* them and
+spends effort chasing false hypotheses — and it does not trip "this is hardened,
+try harder" heuristics.
+
+**Mechanism — the "two versions":** dev tree stays clean; the **release build**
+applies S/M/D via the toolchain (native: linker symbol strip + an IR/source
+rename pass + string-table transform; Android: R8/DexGuard rename + string
+encryption + optional decoy dictionary) and emits a **private mapping file**
+(the "key") kept out of the shipped artifact.
+
+**Hard caveats (keep it honest + safe):**
+- Note on the operator's "hash with a key": a hash is one-way — you could not
+  recover names to debug. Use a **reversible secret mapping** (Mode M), or just
+  strip (Mode S) if you never need them. Hashing buys nothing extra here.
+- **Don't poison your own ops:** scope decoys to *internal* symbols + non-user-facing
+  strings; keep user-facing/diagnostic strings correct or server-mapped, and keep
+  the mapping file so your crash reports stay decodable.
+- Decoys must be **consistent and plausible** or they are a detectable tell.
+- This is **cost, not prevention** — exactly the right bar ("slow it down = win").
+  A thorough agent verifies names against behavior and the decoy falls; the win is
+  the time and the false starts it costs the lazy/at-scale majority.
+
+**Harness hooks:** audit = "identifier/string informativeness" score (dictionary-word
+ratio of symbols, plaintext-string density, debug-info present → how much free
+intel the binary hands an agent); harden = the build-time transform with modes
+S/M/D + mapping output; verify = dev-vs-release identity diff, mapping round-trips
+on a sample crash, and the app still runs correctly.
+
 ## What becomes the harness (audit-first)
 **Audit module (build first — CLAUDE.md "audit before harden"):** a native-binary
 exposure scanner that reads the *same* signals rea's inspectors read and scores
@@ -155,6 +208,12 @@ Prove the full pipeline on one weapon end-to-end:
 3. **Verify:** a test proving (a) the audit detects presence vs absence, and (b) the
    guard actually fires (core dump suppressed / ptrace attach refused).
 This exercises Research→Analysis→Implementation→Testing on a real rea weapon.
+
+**Slice 2 (strong candidate — the operator's decoy idea, AI-specific):** the
+dev↔release identity transform. Audit = identifier/string informativeness score;
+harden = Mode S strip + Mode D decoy on a sample native binary with a mapping
+file; verify = identity diff + mapping round-trip + app still runs. On-thesis
+because it targets the AI comprehension layer directly.
 
 ## Open questions carried from research (need a sandboxed, operator-owned install)
 Authoritative `tools/list`; whether rea screens Frida scripts; GDB/MI session

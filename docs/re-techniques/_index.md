@@ -54,6 +54,7 @@ hardening on top.
 | `uncensored-local-models` | **The model layer.** Open-weight / abliterated / "uncensored" models run locally (GLM-4.x/5.x-class, Qwen-class, DeepSeek-class, Llama-abliterated, dolphin/hermes-uncensored) via Ollama / LM Studio / llama.cpp / vLLM — chosen specifically to strip the vendor **refusal gate, rate limits, and logging** out of the RE loop. Powers every row above when a hosted model would decline. | is the brain behind every P0 row | A+B | list (verify in research) |
 | `ai-crack-as-a-service` | AI-backed crack / keygen / patch "services": Discord & Telegram bots, web SaaS, shared agent skills that hand a finished crack to someone who never opens a tool. The **distribution layer** that makes cracks "public." | `agentic-re` + uncensored models | A+B | list (verify in research) |
 | `ai-cheat-gen` | AI that generates game cheats / trainers / memory patches from a prompt (games specifically). | `memory-scan` / Frida + model | A+B | list (verify in research) |
+| `skill-packs` | Agent **skill routers / packs**: one-line install, then the agent is auto-routed to RE playbooks and bootstraps the toolchain. E.g. `zhaoxuya520/reverse-skill` (43.4k★ — routes APK/binary/JS/firmware/CTF to jadx/apktool/IDA/Ghidra/radare2/Binja/Burp; also carries offensive pentest/exploit/EDR-bypass routing), and `rea`'s bundled skill. The purest "download a skill → you're in." | routes to every tooling-layer engine | A+B | list (verify in research) |
 
 ### The three layers (how to read the table)
 P0 is not one tool — it's a **stack**, and we can attack any layer:
@@ -63,8 +64,9 @@ P0 is not one tool — it's a **stack**, and we can attack any layer:
 2. **Tooling layer** — what acts on the binary (`disasm-mcp`, `agentic-re`,
    `ai-frida-gen`, `decompiler-gpt-plugins`, `llm-decompile-models`,
    `mobile-ai-re`, `ai-deobfuscators`).
-3. **Distribution layer** — how a finished crack reaches non-experts
-   (`ai-crack-as-a-service`).
+3. **Distribution layer** — how the capability reaches non-experts: finished
+   cracks (`ai-crack-as-a-service`) and one-line agent skill routers
+   (`skill-packs`) that turn any coding agent into an RE operator.
 
 **Next phase:** research + analysis on these P0 entries, highest-impact first.
 Leads: `disasm-mcp` and `agentic-re` (tooling), `uncensored-local-models`
