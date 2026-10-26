@@ -51,4 +51,6 @@ binary with a private mapping file + verify round-trip. See `docs/re-techniques/
 1. New chat: clone the repo, read `CLAUDE.md` then this file.
 2. Do the "Next step." Keep the talking-chat thin; write detail to files
    (`research/findings/` or `docs/`), using `docs/workflow/handoff-template.md`.
-3. Before ending: update **this file** (Done / Next step / Parked), commit, push.
+3. Before ending: update **this file** (Done / Next step / Parked) AND append a
+   dated bullet to `cv/contribution-of-blue-team.md` (Contribution Log), then
+   commit and push.
