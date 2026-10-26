@@ -27,3 +27,11 @@ samples/
 
 # Session state (ephemeral agent bookkeeping)
 research/findings/_session-state.md
+
+# Harness build artifacts (produced by make / the verify harness)
+harness/sample/sample_baseline
+harness/sample/sample_hardened
+harness/verify/ptrace_attach_probe
+# Core dumps left by the verify harness control case
+core
+core.*
