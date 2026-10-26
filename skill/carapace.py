@@ -1,0 +1,246 @@
+#!/usr/bin/env python3
+# Carapace — the harness driver the skill calls (Slice C).
+#
+# WHAT THIS IS
+#   A thin, deterministic entry point over harness/ that implements the product
+#   loop from CLAUDE.md "done and worth it" #4: run the AUDIT on an operator
+#   target, read the scored posture + informativeness, and RECOMMEND the next
+#   highest-value hardening — then optionally APPLY the one that is safe to apply
+#   to an already-built binary.
+#
+#   It exists so the skill's behavior is reproducible and testable (a prose-only
+#   skill can't be verified). SKILL.md tells Claude to call this; the policy lives
+#   here, in one place, honest by construction.
+#
+# HONESTY (CLAUDE.md §3/§8): audit before harden. Every recommendation carries a
+#   strength tier and a NAMED bypass, surfaced verbatim — never "unbreakable."
+#   The only Strong tier is server-side relocation, stated when it applies.
+#
+# KINDS OF HARDENING (the skill must not conflate them):
+#   post-build : applicable to the shipped binary as-is (the identity transform).
+#   build-time : requires rebuilding from source (the core-dump / anti-ptrace
+#                guards) — we RECOMMEND and show the integration step; we do NOT
+#                pretend to patch an existing binary into having them.
+#   roadmap    : a known-valuable hardening not yet implemented in this harness
+#                (stated plainly, not silently skipped).
+
+import os
+import sys
+import json
+import argparse
+import subprocess
+
+REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+AUDIT_DIR = os.path.join(REPO, "harness", "audit")
+AUDIT = os.path.join(AUDIT_DIR, "elf_exposure_audit.py")
+TRANSFORM = os.path.join(REPO, "harness", "harden", "carapace_identity_transform.py")
+
+sys.path.insert(0, AUDIT_DIR)
+from elf_exposure_audit import analyze, render  # noqa: E402
+
+
+def _rel(p):
+    try:
+        return os.path.relpath(p, REPO)
+    except ValueError:
+        return p
+
+
+# ---- recommendation policy (ordered, highest value first) ----------------
+# Each rule inspects the audit signals and, if it applies, returns a structured
+# recommendation. Order encodes "next highest-value hardening."
+def _rules(s, binpath):
+    b = _rel(binpath)
+    inf = s["informativeness"]
+    out = []
+
+    # 1. Identity exposure — names/strings an LLM agent reasons from. POST-BUILD.
+    if s["symbols_present"] or s["debug_info_present"] or inf["symbol_total"] > 0:
+        out.append({
+            "id": "identity-transform",
+            "title": "Degrade dev identity: strip / map / decoy symbols (+ internal strings)",
+            "kind": "post-build",
+            "weapon": "rea Cluster B/C + the AI layer (names/strings the agent reasons from)",
+            "tier": "Speed-bump→Meaningful (Meaningful vs lazy/one-shot agents & junior analysts)",
+            "bypass": "Behavioral cross-check (xrefs/value-flow) ignores names; a thorough agent "
+                      "recovers logic, and rea's coverage ledger surfaces decoy contradictions.",
+            "command": f"python3 harness/harden/carapace_identity_transform.py transform "
+                       f"--mode D --in {b} --out {b}.release --map {b}.carapace-map.json",
+            "note": "Keep the mapping file PRIVATE (out of the shipped artifact). Mode S strips, "
+                    "M keeps a reversible opaque map, D plants plausible decoys.",
+        })
+
+    # 2. Core-dump exposure — a crash core hands the agent memory. BUILD-TIME.
+    if not s["coredump_guard_present"]:
+        out.append({
+            "id": "coredump-guard",
+            "title": "Add core-dump suppression guard",
+            "kind": "build-time",
+            "weapon": "rea Cluster E (inspect_recorded_crash)",
+            "tier": "Speed-bump",
+            "bypass": "Attacker re-enables cores on their own host, or reads live memory via Frida/GDB.",
+            "command": "link harness/harden/carapace_guards.c and call carapace_guard_coredump() "
+                       "at startup (see harness/harden/README.md)",
+            "note": "Compile-time: requires a rebuild. setrlimit(RLIMIT_CORE,0)+prctl(PR_SET_DUMPABLE,0).",
+        })
+
+    # 3. Debug/instrumentation attach — the #1 practical threat. BUILD-TIME.
+    if not s["antiptrace_guard_present"]:
+        out.append({
+            "id": "antiptrace-guard",
+            "title": "Add anti-ptrace / anti-debug guard",
+            "kind": "build-time",
+            "weapon": "rea Cluster G (Frida attach, ptrace-based) + Cluster H (GDB)",
+            "tier": "Meaningful",
+            "bypass": "Frida can hook the check; a spawn-paused session loads a bypass before it runs.",
+            "command": "link harness/harden/carapace_guards.c and call carapace_guard_antiptrace() "
+                       "at startup (see harness/harden/README.md)",
+            "note": "Compile-time: requires a rebuild. TracerPid read then PTRACE_TRACEME slot-claim.",
+        })
+
+    # 4. High plaintext-string density — free intel. ROADMAP (needs a loader).
+    if s["string_density"] >= 0.05:
+        out.append({
+            "id": "string-encryption",
+            "title": "Encrypt / decode-on-demand high-density plaintext strings",
+            "kind": "roadmap",
+            "weapon": "rea Cluster B/C (list_strings)",
+            "tier": "Speed-bump→Meaningful",
+            "bypass": "Runtime key recovery via Frida/memory; decode-at-rest if the key is embedded.",
+            "command": "(not yet implemented in this harness — needs a runtime decode loader)",
+            "note": "Stated, not skipped. The identity transform's string-decoy pass covers only "
+                    "declared-internal, same-length strings, not live user-facing ones.",
+        })
+
+    # 5. Link hardening — raises effort, not a decompile blocker.
+    if s["hardening"]["relro"] != "full":
+        out.append({
+            "id": "full-relro",
+            "title": "Link with full RELRO + BIND_NOW",
+            "kind": "build-time",
+            "weapon": "generic exploitation surface (parity with rea's inspect_binary_layout)",
+            "tier": "Trivial→Speed-bump (raises effort; not a comprehension blocker)",
+            "bypass": "Flags don't stop decompilation; purely a runtime-integrity nicety.",
+            "command": "rebuild with -Wl,-z,relro,-z,now",
+            "note": "Compile/link-time.",
+        })
+
+    # Always-true closing truth: the only Strong tier.
+    out.append({
+        "id": "server-relocation",
+        "title": "Relocate secrets & trust decisions server-side",
+        "kind": "design",
+        "weapon": "all client-side analysis (the honest #1 recommendation, CLAUDE.md §3)",
+        "tier": "Strong (the ONLY Strong tier — what the client never holds can't be reversed)",
+        "bypass": "None for the relocated secret itself; the client still needs anti-tamper for the "
+                  "request path, which a server nonce-challenge backs.",
+        "command": "(architecture change — move the secret/logic off the client)",
+        "note": "Applies whenever the client holds something it cannot afford to leak.",
+    })
+    return out
+
+
+def recommend(binpath, want_all=False):
+    s = analyze(binpath)
+    rules = _rules(s, binpath)
+    # the "next highest-value hardening" = first that is actually actionable now
+    # (post-build or build-time), not the always-on design note, unless nothing
+    # else applies.
+    actionable = [r for r in rules if r["id"] != "server-relocation"]
+    top = actionable[0] if actionable else rules[-1]
+    return s, (rules if want_all else [top])
+
+
+# ---- rendering -----------------------------------------------------------
+def _fmt_rec(r):
+    L = [f"  [{r['kind'].upper()}] {r['title']}",
+         f"      denies/degrades : {r['weapon']}",
+         f"      strength tier   : {r['tier']}",
+         f"      named bypass    : {r['bypass']}",
+         f"      how             : {r['command']}"]
+    if r.get("note"):
+        L.append(f"      note            : {r['note']}")
+    return "\n".join(L)
+
+
+def cmd_audit(args):
+    print(render(analyze(args.binary)))
+    return 0
+
+
+def cmd_recommend(args):
+    s, recs = recommend(args.binary, want_all=args.all)
+    if args.json:
+        print(json.dumps({"score": s["score"], "tier": s["tier"], "recommendations": recs}, indent=2))
+        return 0
+    print(f"Carapace — next hardening for {_rel(args.binary)}")
+    print(f"  exposure score {s['score']}/100 — {s['tier']}")
+    print()
+    for r in recs:
+        print(_fmt_rec(r))
+        print()
+    print("  Honest footer: anti-RE raises an attacker's cost; it never makes software")
+    print("  unbreakable. The only Strong tier is moving the secret off the client.")
+    return 0
+
+
+def cmd_apply(args):
+    s, recs = recommend(args.binary, want_all=False)
+    top = recs[0]
+    print(f"Top recommendation: {top['title']}  [{top['kind']}]")
+    if top["kind"] != "post-build":
+        print(f"  This is a {top['kind']} hardening — it cannot be patched into an already-built")
+        print(f"  binary. Integration step: {top['command']}")
+        print("  (Rebuild from source, then re-run `carapace recommend` to confirm.)")
+        return 3
+    # post-build: apply the identity transform
+    out = args.out or (args.binary + ".release")
+    mp = args.map or (args.binary + ".carapace-map.json")
+    cmd = ["python3", TRANSFORM, "transform", "--mode", args.mode,
+           "--in", args.binary, "--out", out, "--map", mp]
+    if args.string_decoys:
+        cmd += ["--string-decoys", args.string_decoys]
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    sys.stdout.write(r.stdout)
+    if r.returncode != 0:
+        sys.stderr.write(r.stderr)
+        return r.returncode
+    print(f"  applied -> {_rel(out)}   (private map: {_rel(mp)})")
+    print("  re-audit the result with `carapace recommend` to see the next step.")
+    return 0
+
+
+def main(argv=None):
+    ap = argparse.ArgumentParser(
+        prog="carapace",
+        description="Drive the Carapace harness: audit a build, recommend and apply hardening.")
+    sub = ap.add_subparsers(dest="cmd", required=True)
+
+    a = sub.add_parser("audit", help="print the full exposure report")
+    a.add_argument("binary")
+    a.set_defaults(fn=cmd_audit)
+
+    r = sub.add_parser("recommend", help="the next highest-value hardening (honest tier + bypass)")
+    r.add_argument("binary")
+    r.add_argument("--all", action="store_true", help="list the full ordered plan")
+    r.add_argument("--json", action="store_true")
+    r.set_defaults(fn=cmd_recommend)
+
+    p = sub.add_parser("apply", help="apply the top recommendation if it is post-build-safe")
+    p.add_argument("binary")
+    p.add_argument("--mode", choices=["S", "M", "D"], default="D")
+    p.add_argument("--out")
+    p.add_argument("--map")
+    p.add_argument("--string-decoys")
+    p.set_defaults(fn=cmd_apply)
+
+    args = ap.parse_args(argv)
+    try:
+        return args.fn(args)
+    except (FileNotFoundError, IsADirectoryError) as e:
+        print(f"carapace error: {e}", file=sys.stderr)
+        return 2
+
+
+if __name__ == "__main__":
+    sys.exit(main())
