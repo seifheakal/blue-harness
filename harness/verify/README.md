@@ -5,6 +5,7 @@ No countermeasure is "done" until a test demonstrates it (CLAUDE.md §4).
 ```
 bash test_slice_a.sh        # Slice A: core-dump + anti-ptrace guards
 bash test_slice_b.sh        # Slice B: dev<->release identity transform
+bash test_slice_c.sh        # Slice C: the drive-the-harness skill loop
 ```
 Exit 0 = all hard assertions passed.
 
@@ -46,6 +47,16 @@ checked on all three).
 **(C) The app still runs** — byte-identical output in every mode; libc imports are
 preserved (scope = internal symbols only, so dynamic linking stays intact).
 
-**Honest scope:** both harnesses prove the countermeasures *fire* and the audit
-*detects/measures* them. Neither claims unbypassability — see each countermeasure's
-named bypass in `../harden/README.md`.
+### Slice C — `test_slice_c.sh` (9/9)
+
+Proves the drive-the-harness skill (`../../skill/`): `carapace audit` reports a
+posture; `carapace recommend` yields the next highest-value hardening with a
+strength tier **and** a named bypass on every item and never overclaims;
+`carapace apply` fires the post-build hardening (app still runs), the
+recommendation then advances (identity-transform → coredump-guard) and the score
+drops; and a build-time hardening is **honestly refused** rather than faked onto
+an already-built binary.
+
+**Honest scope:** these harnesses prove the countermeasures *fire*, the audit
+*detects/measures* them, and the skill *recommends honestly*. None claims
+unbypassability — see each countermeasure's named bypass in `../harden/README.md`.

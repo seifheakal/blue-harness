@@ -23,13 +23,18 @@ harness/
   sample/  sample_app.c + Makefile        — one source; baseline / hardened / dev builds
   verify/  test_slice_a.sh                — audit flips + both guards fire (15/15)
            test_slice_b.sh                — identity transform measured + round-trips (18/18)
+           test_slice_c.sh                — the drive-the-harness skill loop (9/9)
 ```
+
+The driver + skill that tie this together live in `../skill/` (Slice C): run the
+audit, read the posture, recommend/apply the next highest-value hardening.
 
 Prove the slices end-to-end:
 
 ```
 bash harness/verify/test_slice_a.sh     # exit 0 = Slice A verified
 bash harness/verify/test_slice_b.sh     # exit 0 = Slice B verified
+bash harness/verify/test_slice_c.sh     # exit 0 = Slice C verified
 ```
 
 Each subdirectory has its own README (signals read, tiers, bypasses, how to run).
