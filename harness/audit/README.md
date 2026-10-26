@@ -20,6 +20,16 @@ or the `/proc/self/status`+`TracerPid` strings).
 **Output:** an exposure score (0–100, higher = more free intel for an agent), an
 honest posture tier, the exposure drivers, and the *next highest-value hardening*.
 
+**Identifier / string informativeness (Slice B):** the report also scores how much
+*human-readable* intel the binary hands an LLM agent — the ratio of the binary's
+own symbols that read as English words vs opaque tokens, and a count of
+informative strings (messages / format strings / URLs). This measures the
+dev↔release identity transform in `../harden`: Mode S/M drive the ratio toward 0
+(stripped / opaque), while Mode D keeps it high but the names are now *wrong*
+(misdirection the ratio can't see — the verify proves D via the mapping and the
+decoy-plausibility check). This block is reported on its own and does **not** feed
+the main exposure score (keeps Slice A's test invariant stable).
+
 **Honesty (CLAUDE.md §3):** this is a heuristic posture report, not a guarantee.
 "Guard PRESENT" means the binary *references* that guard's syscalls/strings — the
 same inference the attacker's agent makes. Proof a guard actually **fires** lives
