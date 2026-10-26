@@ -10,5 +10,24 @@ The tool an operator runs against **their own** native/mobile build. Three parts
 - **verify/** — prove each hardening actually fires and that the audit detects its
   presence/absence. No countermeasure is "done" without a test here.
 
-Status: empty — **Implementation Slice A** lands here first (see `docs/STATE.md`).
-Every countermeasure carries a strength tier + named bypass (CLAUDE.md §3/§8).
+Status: **Implementation Slice A landed** (see `docs/STATE.md`). Every
+countermeasure carries a strength tier + named bypass (CLAUDE.md §3/§8).
+
+```
+harness/
+  audit/   elf_exposure_audit.py   — read-only ELF exposure scanner (scored, tiered)
+  harden/  carapace_guards.{c,h}   — core-dump suppression + anti-ptrace guards
+  sample/  sample_app.c + Makefile — one source, two builds (baseline / hardened)
+  verify/  test_slice_a.sh         — proves the audit flips and both guards fire
+```
+
+Prove the whole slice end-to-end:
+
+```
+bash harness/verify/test_slice_a.sh     # exit 0 = Slice A verified
+```
+
+Each subdirectory has its own README (signals read, tiers, bypasses, how to run).
+Slice A denies two **named `rea` weapons**: Cluster E (`inspect_recorded_crash`)
+and Cluster G/H (Frida-attach + GDB). Honest tiers: Speed-bump / Meaningful —
+never "unbreakable."
