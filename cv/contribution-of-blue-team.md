@@ -86,6 +86,23 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 ## Contribution Log (append after every bit — newest at top)
 
 ### 2026-10-26
+- **Shipped Implementation Slice A (audit → harden → verify, all green)** — the
+  first working end-to-end defense in `harness/`, proving the full pipeline on two
+  named `rea` weapons:
+  - Built a dependency-free **ELF exposure audit scanner** (pure-Python ELF parser)
+    that reads the same static signals an AI-assisted RE agent reads and emits a
+    scored, tiered posture report + the next highest-value hardening.
+  - Implemented two **self-defense guards** for a sample Linux ELF — core-dump
+    suppression (denies `rea` Cluster E crash-reader) and anti-ptrace
+    (`PTRACE_TRACEME` slot-claim + `TracerPid`; denies Cluster G Frida-attach /
+    Cluster H GDB) — each with an honest tier (Speed-bump / Meaningful) and a
+    named bypass in-file.
+  - Wrote a **verification harness (15/15 assertions)** proving the audit flips
+    present↔absent on the guards alone and that both guards actually fire (real
+    core suppressed; `PTRACE_ATTACH` refused with EPERM) while the app still runs.
+  - Demonstrated the audit-before-harden discipline and honest-claims rule on real
+    binaries, and caught/fixed a genuine ordering bug (read `TracerPid` before
+    `TRACEME`, else the guard self-false-positives).
 - Set up the CV/portfolio record (this file) and wired its upkeep into the
   cross-chat handoff protocol.
 - Added the living `docs/STATE.md` handoff file and purpose READMEs for `harness/`
