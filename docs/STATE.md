@@ -5,7 +5,7 @@
 > pass work between chats without dumping context. Keep it short and current.
 
 - Last updated: 2026-10-26
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A + B ✅) → Testing ✅ (A: 15/15, B: 18/18) → Slice C ⬅ next**
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A + B + C ✅) → Testing ✅ (A: 15/15, B: 18/18, C: 9/9) → Slice D ⬅ next**
 - Worked specimen: **`rea`** (morluto/rea, npm `rea-agents`) — the P0 reference.
 
 ## Done so far
@@ -68,17 +68,37 @@
     decode loader (separate hardening); this slice decoys only declared-internal
     strings, behavior-guarded by the verify.
 
-## Next step (decided)
-**Slice C — the drive-the-harness skill** (`skill/`), completing the product loop
-(CLAUDE.md "done and worth it" #4): a Claude skill that runs the audit on an
-operator target, reads the scored posture + informativeness, and recommends the
-next highest-value hardening (pointing at the right `harden/` tool). Needs no
-parked VM. Keep it audit-first and honest (surface tiers + bypasses verbatim).
+- **Implementation — Slice C ✅ (the drive-the-harness skill).** In `skill/`:
+  - `skill/carapace.py` — deterministic driver over `harness/`: `audit` (full
+    exposure report), `recommend [--all] [--json]` (next highest-value hardening
+    with a strength tier + a **named bypass** on every item, ordered plan ending
+    in the server-relocation Strong-tier truth), and `apply` (runs the post-build
+    identity transform; **honestly refuses** to fake a build-time guard onto an
+    already-built binary, pointing at the rebuild step instead).
+  - `skill/SKILL.md` — the Claude skill: frontmatter + the audit→recommend→apply
+    loop and the non-negotiable honesty rules (audit-first, tier+bypass verbatim,
+    server-side truth, never "unbreakable"). Install by symlinking `skill/` to
+    `.claude/skills/carapace/`.
+  - **Verify:** `harness/verify/test_slice_c.sh` — **9/9 pass**: the loop runs,
+    every recommendation carries a tier + bypass and never overclaims, `apply`
+    fires the post-build hardening (app still runs), the recommendation advances
+    (identity-transform → coredump-guard) and the score drops (84→39), and a
+    build-time hardening is refused with guidance (rc=3).
 
-**Then** (push toward the only *Strong* tier): runtime **code-integrity
-self-checksum + server-side attestation** and an **anti-Frida detector**
-(rea Cluster G) — client checks tiered *Meaningful*, backed by a server nonce so a
-one-time hook at resume isn't enough. See `docs/re-techniques/rea.md` Cluster G.
+## Next step (decided)
+**Slice D — push toward the only *Strong* client-side tier:** runtime
+**code-integrity self-checksum + server-side attestation**, and an **anti-Frida
+detector** (rea Cluster G). Add a guard that checksums hot functions and verifies
+**server-side with a nonce challenge** (so a one-time hook at resume isn't
+enough), plus a maps/port/thread-name Frida scan. Audit gains "integrity/anti-Frida
+present?"; verify proves the checksum detects a patched function and the detector
+flags an injected agent. Tier honestly: client checks *Meaningful* (Frida can hook
+them); the server-nonce binding is what pushes integrity toward *Strong*. Then wire
+both into `skill/carapace.py`'s recommendation policy. See `docs/re-techniques/rea.md`
+Cluster G.
+
+**Parked validation (unchanged):** the AI-layer claims (decoy effectiveness,
+coverage-poisoning) still need the sandboxed `rea` VM to measure empirically.
 
 ## Parked / needs operator action
 - A **sandboxed, operator-owned `rea` install** (throwaway VM) is the only way to

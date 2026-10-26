@@ -86,6 +86,20 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 ## Contribution Log (append after every bit — newest at top)
 
 ### 2026-10-26
+- **Shipped Implementation Slice C (the drive-the-harness skill, 9/9 green)** —
+  closed the product loop (audit → score → recommend → apply → re-audit):
+  - Built a **deterministic driver** (`skill/carapace.py`) over the harness with
+    `audit` / `recommend` / `apply`, and the **Claude skill** (`SKILL.md`) that
+    calls it — putting the recommendation policy in one testable place rather than
+    improvised prose.
+  - The recommender emits the **next highest-value hardening** with an honest
+    strength tier **and a named bypass on every item**, orders the full plan, and
+    always surfaces the server-side-relocation *Strong* tier — and `apply`
+    **refuses to fake a build-time guard** onto an already-built binary, pointing
+    at the rebuild instead (honest about what can and can't be patched post-hoc).
+  - Verified the loop end-to-end: recommendations never overclaim ("unbreakable"
+    guarded against in tests), the post-build hardening fires with the app still
+    running, and the recommendation advances as posture improves (score 84→39).
 - **Shipped Implementation Slice B (dev↔release identity transform, 18/18 green)**
   — the project's novel, AI-specific countermeasure, targeting how LLM agents
   actually reason (from names and strings):
