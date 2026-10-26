@@ -86,6 +86,25 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 ## Contribution Log (append after every bit — newest at top)
 
 ### 2026-10-26
+- **Shipped Implementation Slice B (dev↔release identity transform, 18/18 green)**
+  — the project's novel, AI-specific countermeasure, targeting how LLM agents
+  actually reason (from names and strings):
+  - Extended the audit scanner with an **identifier/string informativeness** score
+    (English-word ratio of the binary's own symbols + informative-string count) —
+    a measure of the free intel a binary hands an AI agent.
+  - Built a **build-time identity transform** over the compiled ELF (binutils-
+    based) with three modes — **strip**, reversible **map**, and **decoy**
+    (plausible-but-wrong names) — plus an opt-in same-length internal-string decoy,
+    emitting a **private mapping file** so crash reports stay decodable while the
+    shipped artifact misleads.
+  - Verified end-to-end: the audit measures the transform, the mapping round-trips
+    with **no dev identity leaking** into the artifact, the decoy build stays
+    *plausible* (avoiding the "opaque ⇒ obfuscated" tell), and the app runs with
+    **byte-identical output** — scope held to internal symbols so dynamic linking
+    stays intact.
+  - Kept it honest: tiered Speed-bump→Meaningful with a named behavioral bypass,
+    and explicitly scoped out live-string encryption (needs a runtime loader)
+    rather than overclaiming.
 - **Shipped Implementation Slice A (audit → harden → verify, all green)** — the
   first working end-to-end defense in `harness/`, proving the full pipeline on two
   named `rea` weapons:

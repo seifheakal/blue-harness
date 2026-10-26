@@ -5,7 +5,7 @@
 > pass work between chats without dumping context. Keep it short and current.
 
 - Last updated: 2026-10-26
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slice A ✅) → Testing ✅ for A → Slice B ⬅ next**
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A + B ✅) → Testing ✅ (A: 15/15, B: 18/18) → Slice C ⬅ next**
 - Worked specimen: **`rea`** (morluto/rea, npm `rea-agents`) — the P0 reference.
 
 ## Done so far
@@ -41,27 +41,52 @@
     **EPERM**; gdb trips the TRACEME detection branch); hardened still runs.
   - Caught & fixed a real logic bug mid-slice: TracerPid must be read *before*
     TRACEME (TRACEME makes the parent the tracer → self-false-positive otherwise).
+- **Implementation — Slice B ✅ (dev↔release identity transform; the AI-layer
+  decoy play).** In `harness/` (Linux x86-64, `python3`+binutils, no external
+  deps):
+  - **Audit:** extended `harness/audit/elf_exposure_audit.py` with an
+    **identifier/string informativeness** block — ratio of the binary's own
+    symbols that read as English words vs opaque, plus an informative-string
+    count. Reported separately; does **not** alter the Slice-A exposure score.
+    Factored a shared `own_symbols()` so audit and transform agree on scope.
+  - **Harden:** `harness/harden/carapace_identity_transform.py` — operates on the
+    compiled ELF via `objcopy`/`strip` with modes **S** (strip symtab+DWARF),
+    **M** (opaque `cp_NNNNNN` + reversible map), **D** (plausible decoy names from
+    `decoy_dictionary.txt` + reversible map); plus an opt-in **same-length**
+    `.rodata` string-decoy pass. Emits a **private `mapping.json`** (new→old) kept
+    out of the ship; `resolve` recovers dev names for crash triage. Scope =
+    internal FUNC/OBJECT only; libc imports untouched. Denies rea Cluster B/C +
+    the AI layer. Tier **Speed-bump→Meaningful**, bypass named in-file.
+  - **Sample:** added an internal, never-printed `INTERNAL_BUILD_TAG` (folded into
+    a volatile sink) as a sound string-decoy target; `sample_dev` build target.
+  - **Verify:** `harness/verify/test_slice_b.sh` — **18/18 pass**: audit measures
+    the transform (S total=0; M ratio≈0 opaque; D ratio≈1.0 plausible, and D reads
+    more natural than M); mapping round-trips for every symbol + the string decoy;
+    **no dev name leaks** into any artifact (nm+strings); byte-identical output in
+    every mode; libc imports preserved.
+  - Honest gap stated, not skipped: encrypting *live* strings needs a runtime
+    decode loader (separate hardening); this slice decoys only declared-internal
+    strings, behavior-guarded by the verify.
 
 ## Next step (decided)
-**Implementation — Slice B** (the operator's decoy idea, AI-specific): the
-dev↔release **identity transform** — targets the AI comprehension layer directly.
-1. **Audit:** an "identifier/string informativeness" score (dictionary-word ratio
-   of symbols, plaintext-string density, debug-info present) — how much free intel
-   the binary hands an agent. Extends the Slice-A scanner.
-2. **Harden:** build-time transform with modes **S** (strip/opaque), **M**
-   (reversible secret map), **D** (decoy: plausible-but-wrong names/strings) on a
-   sample native binary, emitting a **private mapping file** kept out of the ship.
-3. **Verify:** dev-vs-release identity diff, mapping round-trips on a sample crash,
-   and the app still runs correctly.
-Honesty: tier **Speed-bump→Meaningful** (Meaningful vs lazy/one-shot agents),
-never "unbreakable"; scope decoys to internal symbols only. See the dedicated
-section in `docs/re-techniques/rea.md`.
+**Slice C — the drive-the-harness skill** (`skill/`), completing the product loop
+(CLAUDE.md "done and worth it" #4): a Claude skill that runs the audit on an
+operator target, reads the scored posture + informativeness, and recommends the
+next highest-value hardening (pointing at the right `harden/` tool). Needs no
+parked VM. Keep it audit-first and honest (surface tiers + bypasses verbatim).
+
+**Then** (push toward the only *Strong* tier): runtime **code-integrity
+self-checksum + server-side attestation** and an **anti-Frida detector**
+(rea Cluster G) — client checks tiered *Meaningful*, backed by a server nonce so a
+one-time hook at resume isn't enough. See `docs/re-techniques/rea.md` Cluster G.
 
 ## Parked / needs operator action
 - A **sandboxed, operator-owned `rea` install** (throwaway VM) is the only way to
   resolve the deep open questions (authoritative `tools/list`, whether `rea`
   screens Frida scripts, GDB/MI reality, stripped-binary decompile). Not required
-  for Slice A/B. Do not install offensive tooling in the dev container.
+  for the implemented slices or the skill; it gates *empirical* validation of the
+  AI-layer claims (decoy effectiveness, coverage-poisoning). Do not install
+  offensive tooling in the dev container.
 - P0 entries still `list (verify in research)`: `disasm-mcp`+`agentic-re` are in
   analysis (via `rea.md`); the rest await their own research passes.
 
