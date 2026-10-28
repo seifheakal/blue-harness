@@ -98,6 +98,38 @@ def _rules(s, binpath):
             "note": "Compile-time: requires a rebuild. TracerPid read then PTRACE_TRACEME slot-claim.",
         })
 
+    # 3b. Frida injection — rea's only in-process modification path. BUILD-TIME.
+    if not s["antifrida_guard_present"]:
+        out.append({
+            "id": "antifrida-detector",
+            "title": "Add anti-Frida detector (maps / thread-name / port-27042 scan)",
+            "kind": "build-time",
+            "weapon": "rea Cluster G (start_frida_session + load_frida_script — inject path)",
+            "tier": "Meaningful",
+            "bypass": "Frida stalker/stealth modes, a renamed gadget, a non-default port, or an "
+                      "attacker who edits the signatures once found.",
+            "command": "link harness/harden/carapace_antifrida.c and call carapace_antifrida_scan() "
+                       "at startup / periodically (see harness/harden/README.md)",
+            "note": "Compile-time. One of three signals trips detection; no single client check suffices.",
+        })
+
+    # 3c. Code integrity — defeats the VALUE of a patch, server-tied. BUILD-TIME.
+    if not s["integrity_guard_present"]:
+        out.append({
+            "id": "integrity-attestation",
+            "title": "Add runtime code-integrity self-checksum + server-nonce attestation",
+            "kind": "build-time",
+            "weapon": "rea Cluster G (patch a hot function, e.g. a license check)",
+            "tier": "Meaningful→Strong (the server-nonce binding is what pushes it toward Strong)",
+            "bypass": "A sustained live hook that recomputes the pristine checksum each challenge; "
+                      "the client key can be extracted — so trust rests on the SERVER nonce + the "
+                      "server holding the good checksum, not on client-side secrecy.",
+            "command": "link harness/harden/carapace_integrity.c, attest with "
+                       "carapace_integrity_response(nonce) to your server (ref: harness/harden/attest_server.py)",
+            "note": "Compile-time + a server. Replay- and patch-resistant only with a per-challenge "
+                    "server nonce; not a substitute for keeping the secret server-side.",
+        })
+
     # 4. High plaintext-string density — free intel. ROADMAP (needs a loader).
     if s["string_density"] >= 0.05:
         out.append({
