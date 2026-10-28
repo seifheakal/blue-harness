@@ -68,3 +68,53 @@ this tool only decoys declared-internal strings.
 
 `decoy_dictionary.txt` — the plausible decoy names for Mode D (consistent,
 natural-looking, so they don't trip "this is obfuscated" heuristics).
+
+---
+
+## Runtime integrity + anti-Frida (Slice D) — vs rea Cluster G
+
+Frida is rea's **only in-process modification path**. Two guards raise its cost;
+both are libc-only (self-contained SHA-256/HMAC, no OpenSSL).
+
+### Code-integrity + server-nonce attestation — `carapace_integrity.{c,h}`
+
+Defeats the *value* of a patch (e.g. a NOP'd license check). The client returns
+`HMAC(key, nonce || SHA-256(hot-function bytes))`; the **server** issues a fresh
+nonce per challenge and holds the known-good checksum (`attest_server.py` is the
+reference verifier).
+
+```
+carapace_hotfn_checksum(out32);                         // SHA-256 of the hot fn
+carapace_integrity_response(nonce, nonce_len, mac32);   // HMAC(key, nonce||checksum)
+```
+
+| Property | Result |
+|---|---|
+| patched hot function | checksum changes → MAC mismatch → server **REJECT** |
+| replayed response | nonce changed → **REJECT** |
+| pristine | **ACCEPT** (C MAC == stdlib `hmac`, cross-checked in verify) |
+
+**Tier:** client self-checksum alone is *Meaningful* (Frida can hook the reader);
+the **server-nonce binding pushes toward *Strong*** — a one-time hook at resume
+isn't enough. **Named bypass:** a sustained live hook recomputing the pristine
+checksum each challenge; the client key can be extracted, so trust rests on the
+server nonce + the server holding the good checksum, **not** on client secrecy.
+Not a substitute for keeping the secret server-side (the only truly Strong tier).
+
+### Anti-Frida detector — `carapace_antifrida.{c,h}`
+
+```
+int flags = carapace_antifrida_scan(detail, sizeof detail);  // 0 = clean
+```
+
+Three cheap, independent signals (any one trips): a `frida-agent`/`gum` **mapping**
+in `/proc/self/maps`, a Frida worker **thread name** (`gum-js-loop`, …) in
+`/proc/self/task/*/comm`, and a **listener on port 27042** (connect probe —
+portable where `/proc/net/tcp` is namespaced/stale). Generic GLib names
+(`gmain`/`gdbus`) are deliberately not matched, to avoid false positives.
+
+**Tier:** *Meaningful*. **Named bypass:** Frida stalker/stealth modes, a renamed
+gadget, a non-default port, or an attacker who edits the signatures once found.
+
+`attest_server.py` — the reference server-side verifier (stdlib `hmac`/`hashlib`):
+`nonce` issues a challenge, `verify` accepts/rejects a client response.

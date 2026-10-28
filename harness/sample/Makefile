@@ -29,5 +29,13 @@ sample_hardened: sample_app.c $(HARDEN)/carapace_guards.c $(HARDEN)/carapace_gua
 	$(CC) $(CFLAGS) $(INCLUDE) -DCARAPACE_HARDENED -o $@ \
 		sample_app.c $(HARDEN)/carapace_guards.c
 
+# Slice D: integrity/attestation + anti-Frida guards. Built on demand.
+# -O1 keeps the hot function a stable, bounded block (end marker right after it).
+sample_attest: sample_attest.c $(HARDEN)/carapace_integrity.c $(HARDEN)/carapace_antifrida.c \
+               $(HARDEN)/carapace_integrity.h $(HARDEN)/carapace_antifrida.h
+	$(CC) -O1 -g -Wall -Wextra $(INCLUDE) -o $@ \
+		sample_attest.c $(HARDEN)/carapace_integrity.c $(HARDEN)/carapace_antifrida.c \
+		-lpthread -ldl
+
 clean:
-	rm -f sample_baseline sample_hardened sample_dev sample_release_*
+	rm -f sample_baseline sample_hardened sample_dev sample_release_* sample_attest sample_attest_*
