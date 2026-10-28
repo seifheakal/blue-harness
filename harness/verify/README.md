@@ -6,6 +6,7 @@ No countermeasure is "done" until a test demonstrates it (CLAUDE.md §4).
 bash test_slice_a.sh        # Slice A: core-dump + anti-ptrace guards
 bash test_slice_b.sh        # Slice B: dev<->release identity transform
 bash test_slice_c.sh        # Slice C: the drive-the-harness skill loop
+bash test_slice_d.sh        # Slice D: integrity/attestation + anti-Frida
 ```
 Exit 0 = all hard assertions passed.
 
@@ -56,6 +57,22 @@ strength tier **and** a named bypass on every item and never overclaims;
 recommendation then advances (identity-transform → coredump-guard) and the score
 drops; and a build-time hardening is **honestly refused** rather than faked onto
 an already-built binary.
+
+### Slice D — `test_slice_d.sh` (16/16)
+
+Proves the runtime integrity/attestation + anti-Frida guards **without installing
+Frida** (the test reproduces the exact OS footprint Frida leaves and patches the
+on-disk code):
+
+- the audit detects both guards present↔absent;
+- **integrity/attestation fires** — the C client MAC matches the stdlib server
+  (SHA-256/HMAC correct) so a pristine build is ACCEPTED; patching the hot
+  function's license-check constant on disk changes the checksum and the server
+  **REJECTS** it; a replayed response is **REJECTED** (fresh nonce); and the
+  patched app still runs locally — the server is the gate;
+- **anti-Frida fires** — a clean process is clean (no false positive); a process
+  carrying a `frida-agent` mapping + a `gum-js-loop` thread + a `:27042` listener
+  is detected on all three signals.
 
 **Honest scope:** these harnesses prove the countermeasures *fire*, the audit
 *detects/measures* them, and the skill *recommends honestly*. None claims
