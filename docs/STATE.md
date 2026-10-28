@@ -5,7 +5,7 @@
 > pass work between chats without dumping context. Keep it short and current.
 
 - Last updated: 2026-10-26
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A + B + C ✅) → Testing ✅ (A: 15/15, B: 18/18, C: 9/9) → Slice D ⬅ next**
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–D ✅) → Testing ✅ (A:15/15, B:18/18, C:9/9, D:16/16) → Slice E ⬅ next**
 - Worked specimen: **`rea`** (morluto/rea, npm `rea-agents`) — the P0 reference.
 
 ## Done so far
@@ -85,20 +85,40 @@
     (identity-transform → coredump-guard) and the score drops (84→39), and a
     build-time hardening is refused with guidance (rc=3).
 
-## Next step (decided)
-**Slice D — push toward the only *Strong* client-side tier:** runtime
-**code-integrity self-checksum + server-side attestation**, and an **anti-Frida
-detector** (rea Cluster G). Add a guard that checksums hot functions and verifies
-**server-side with a nonce challenge** (so a one-time hook at resume isn't
-enough), plus a maps/port/thread-name Frida scan. Audit gains "integrity/anti-Frida
-present?"; verify proves the checksum detects a patched function and the detector
-flags an injected agent. Tier honestly: client checks *Meaningful* (Frida can hook
-them); the server-nonce binding is what pushes integrity toward *Strong*. Then wire
-both into `skill/carapace.py`'s recommendation policy. See `docs/re-techniques/rea.md`
-Cluster G.
+- **Implementation — Slice D ✅ (runtime integrity/attestation + anti-Frida; rea
+  Cluster G).** In `harness/` (libc-only C — self-contained SHA-256/HMAC, no
+  OpenSSL; stdlib-only Python server):
+  - **Harden:** `harness/harden/carapace_integrity.{c,h}` — SHA-256 of a hot
+    function's loaded bytes + `HMAC(key, nonce || checksum)` attestation;
+    `carapace_antifrida.{c,h}` — maps/thread-name/port-27042 (connect-probe) Frida
+    scan; `harness/harden/attest_server.py` — reference server-nonce verifier.
+    Tiers: anti-Frida *Meaningful*; integrity *Meaningful→Strong* (server-nonce
+    binding), bypasses named in-file.
+  - **Audit:** detects `integrity_guard_present` (our symbols or a SHA-256 constant
+    tell) and `antifrida_guard_present` (our symbol or the Frida signature
+    strings); reported in the guards section (not folded into the main score).
+  - **Sample:** `harness/sample/sample_attest.c` — a hot "license check" fn with a
+    patchable magic constant + modes (checksum/attest/antifrida/antifrida-plant).
+  - **Verify:** `harness/verify/test_slice_d.sh` — **16/16**, no Frida installed
+    (footprint reproduced; code patched on disk): audit flip; pristine ACCEPT (C
+    MAC == stdlib `hmac`); patched hot-fn → server REJECT; replay → REJECT; patched
+    app still runs; anti-Frida clean→clean and planted→maps+threads+port27042.
+  - **Skill:** wired `antifrida-detector` + `integrity-attestation` into
+    `skill/carapace.py`'s recommendation policy (present guards aren't re-recommended).
 
-**Parked validation (unchanged):** the AI-layer claims (decoy effectiveness,
-coverage-poisoning) still need the sandboxed `rea` VM to measure empirically.
+## Next step (decided)
+**Slice E — public front door + one-command demo.** The harness proves four
+countermeasures but a newcomer can't see it in 30s. Add a top-level `make`/driver
+that runs all four verify slices and prints a single posture summary, refresh
+`README.md` (the pitch + a copy-paste quickstart + an honest "what this is/ isn't"),
+and have `skill/carapace.py` grow a `report` subcommand that renders the full
+audit + ordered plan for a target in one call. No new countermeasure — this is the
+"measure it, harden it, prove it" story made legible for the CV/GitHub audience
+(CLAUDE.md "done and worth it"). Keep every claim tiered and bypass-named.
+
+**Then / parked:** empirical AI-layer validation (decoy effectiveness,
+coverage-poisoning) still needs the sandboxed, operator-owned `rea` VM — do not
+install offensive tooling in the dev container.
 
 ## Parked / needs operator action
 - A **sandboxed, operator-owned `rea` install** (throwaway VM) is the only way to

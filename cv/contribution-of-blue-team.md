@@ -85,6 +85,28 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 
 ## Contribution Log (append after every bit — newest at top)
 
+### 2026-10-28
+- **Shipped Implementation Slice D (runtime integrity/attestation + anti-Frida,
+  16/16 green)** — the push toward the only *Strong* client-side tier, against
+  Frida (the adversary agent's one in-process modification path):
+  - Implemented a **code-integrity self-checksum + server-nonce attestation**
+    protocol — the client returns `HMAC(key, nonce || SHA-256(hot-function))` and
+    a reference server holds the known-good checksum and issues a fresh nonce per
+    challenge. Wrote a **self-contained SHA-256 + HMAC-SHA256 in C** (no OpenSSL),
+    cross-checked byte-for-byte against Python's `hmac`/`hashlib`.
+  - Demonstrated the defense end-to-end **without installing any offensive
+    tooling**: patching a license-check constant in the on-disk binary changes the
+    checksum and the server rejects the attestation; a replayed response is
+    rejected by the nonce binding; the patched app still runs locally — proving the
+    *server* is the gate.
+  - Built an **anti-Frida detector** (injected-agent mapping, Frida worker thread
+    names, default-port listener via a portable connect probe) with deliberate
+    false-positive avoidance, tested by reproducing Frida's exact OS footprint.
+  - Extended the audit to detect both guards, wired them into the skill's
+    recommendation policy, and tiered honestly: anti-Frida *Meaningful*, integrity
+    *Meaningful→Strong* only when server-nonce-tied — with the client-key-extraction
+    limitation stated, not hidden.
+
 ### 2026-10-26
 - **Shipped Implementation Slice C (the drive-the-harness skill, 9/9 green)** —
   closed the product loop (audit → score → recommend → apply → re-audit):
