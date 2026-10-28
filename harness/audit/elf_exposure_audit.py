@@ -490,6 +490,18 @@ def analyze(path):
         ("ptrace" in syms)
         or (b"/proc/self/status" in blob_lower and b"TracerPid" in blob_lower)
     )
+    # Runtime code-integrity / attestation: our guard symbols, or a SHA-256
+    # implementation tell (the first two FIPS 180-4 round constants, LE bytes).
+    sha256_tell = (b"\x98\x2f\x8a\x42" in blob_lower) and (b"\x91\x44\x37\x71" in blob_lower)
+    integrity_guard_present = (
+        ("carapace_hotfn_checksum" in syms) or ("carapace_integrity_response" in syms)
+        or sha256_tell
+    )
+    # Anti-Frida detector: our scan symbol, or the Frida signature strings it embeds.
+    antifrida_guard_present = (
+        ("carapace_antifrida_scan" in syms)
+        or (b"gum-js-loop" in blob_lower) or (b"frida-agent" in blob_lower)
+    )
 
     signals = {
         "file": os.path.basename(path),
@@ -508,6 +520,8 @@ def analyze(path):
         "toolchain_metadata": meta,
         "coredump_guard_present": coredump_guard_present,
         "antiptrace_guard_present": antiptrace_guard_present,
+        "integrity_guard_present": integrity_guard_present,
+        "antifrida_guard_present": antifrida_guard_present,
         "informativeness": informativeness(elf, str_target),
     }
     signals["score"], signals["tier"], signals["recommendation"] = score(signals)
@@ -625,6 +639,10 @@ def render(s):
              "   (vs rea Cluster E / inspect_recorded_crash)")
     L.append(f"    anti-ptrace / anti-dbg . {yn(s['antiptrace_guard_present'])}"
              "   (vs rea Cluster G Frida-attach + Cluster H GDB)")
+    L.append(f"    code-integrity/attest .. {yn(s['integrity_guard_present'])}"
+             "   (vs rea Cluster G patch; server-nonce = →Strong)")
+    L.append(f"    anti-Frida detector .... {yn(s['antifrida_guard_present'])}"
+             "   (vs rea Cluster G Frida inject)")
     L.append("")
     L.append("  Exposure drivers:")
     for r in s["recommendation"]["exposure_drivers"]:
