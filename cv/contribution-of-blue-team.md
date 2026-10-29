@@ -85,6 +85,21 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 
 ## Contribution Log (append after every bit — newest at top)
 
+### 2026-10-29
+- **Shipped Implementation Slice E (public front door + one-command demo, 7/7
+  green; 65/65 across all slices).** Made the "measure it, harden it, prove it"
+  story legible end-to-end:
+  - Added a repo-root `Makefile` (`make demo` / `verify` / `report` / `audit`)
+    and a consolidated `run_all.sh` that runs every verify slice and prints a
+    single honest posture summary — a newcomer sees the whole thing work in ~30s.
+  - Gave the skill a `report` one-shot (full audit + ordered hardening plan, each
+    item tiered and bypass-named) and tightened the no-overclaim footer.
+  - Rewrote the README into a real front door (quickstart, a "what's built" table
+    of five countermeasures with strength tiers and named bypasses, and an honest
+    "what it is / isn't"), retiring the stale "early scaffolding" status.
+  - Caught and fixed an over-strict honesty test (it rejected the legitimate
+    negation "nothing here is unbreakable") rather than weakening the honesty check.
+
 ### 2026-10-28
 - **Shipped Implementation Slice D (runtime integrity/attestation + anti-Frida,
   16/16 green)** — the push toward the only *Strong* client-side tier, against

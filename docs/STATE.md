@@ -5,7 +5,7 @@
 > pass work between chats without dumping context. Keep it short and current.
 
 - Last updated: 2026-10-26
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–D ✅) → Testing ✅ (A:15/15, B:18/18, C:9/9, D:16/16) → Slice E ⬅ next**
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–E ✅) → Testing ✅ (65/65 via `make verify`) → Slice F ⬅ next**
 - Worked specimen: **`rea`** (morluto/rea, npm `rea-agents`) — the P0 reference.
 
 ## Done so far
@@ -106,15 +106,36 @@
   - **Skill:** wired `antifrida-detector` + `integrity-attestation` into
     `skill/carapace.py`'s recommendation policy (present guards aren't re-recommended).
 
+- **Implementation — Slice E ✅ (public front door + one-command demo).**
+  - Repo-root `Makefile`: `make demo` (measure → prove in ~30s), `make verify`,
+    `make report BIN=…`, `make audit BIN=…`, `make clean`.
+  - `harness/verify/run_all.sh`: runs every slice and prints ONE consolidated
+    posture summary (**65/65** across A–E), honest footer (proves they *fire*,
+    not that they're unbreakable; each has a named bypass).
+  - `skill/carapace.py report <bin>`: full audit + ordered hardening plan in one
+    call. Reworded the honest footer to lead with the negation.
+  - Refreshed `README.md` (quickstart, "what's built" tiers+bypasses table,
+    honest "what it is / isn't", updated status) — no more "early scaffolding".
+  - **Verify:** `harness/verify/test_slice_e.sh` (**7/7**) covers the `report`
+    one-shot (audit+plan, tier+bypass on every item, no overclaiming).
+
 ## Next step (decided)
-**Slice E — public front door + one-command demo.** The harness proves four
-countermeasures but a newcomer can't see it in 30s. Add a top-level `make`/driver
-that runs all four verify slices and prints a single posture summary, refresh
-`README.md` (the pitch + a copy-paste quickstart + an honest "what this is/ isn't"),
-and have `skill/carapace.py` grow a `report` subcommand that renders the full
-audit + ordered plan for a target in one call. No new countermeasure — this is the
-"measure it, harden it, prove it" story made legible for the CV/GitHub audience
-(CLAUDE.md "done and worth it"). Keep every claim tiered and bypass-named.
+**Slice F — string encryption with a runtime decode loader.** This closes the one
+gap the skill currently labels *roadmap / not yet implemented*: the audit already
+scores plaintext-string density, but we only decoy declared-internal strings. Add
+a build-time pass that encrypts selected string literals and a tiny runtime
+decode-on-demand loader so they are **absent from a static `strings`/`list_strings`
+view** but correct at runtime. Audit: string-density drops + "encrypted-strings
+present?"; harden: encrypt + loader (reuse the Slice-D SHA/XOR or a keystream);
+verify: target strings gone from static view, app prints them correctly, density
+drops. Tier **Speed-bump→Meaningful**; named bypass: runtime key recovery via
+Frida/memory, or decode-at-rest if the key is embedded. Then drop the "roadmap"
+label in `skill/carapace.py`.
+
+**Follow-ons / parked:** a `.github/workflows` CI that runs `make verify`; a
+second-format audit pass (PE or Mach-O); and the empirical AI-layer validation
+(decoy effectiveness, coverage-poisoning) that still needs the sandboxed,
+operator-owned `rea` VM — do not install offensive tooling in the dev container.
 
 **Then / parked:** empirical AI-layer validation (decoy effectiveness,
 coverage-poisoning) still needs the sandboxed, operator-owned `rea` VM — do not
