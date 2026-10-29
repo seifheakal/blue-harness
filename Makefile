@@ -1,0 +1,47 @@
+# Carapace — top-level entry point. Measure it, harden it, prove it.
+#
+#   make demo     see it in ~30s: audit a sample, show its plan, prove the defenses
+#   make verify   run every verify slice and print one posture summary
+#   make audit    audit a binary:  make audit BIN=path/to/elf
+#   make report   full audit + ordered hardening plan: make report BIN=path/to/elf
+#   make clean    remove build artifacts
+
+BIN ?= harness/sample/sample_dev
+
+.PHONY: demo verify audit report clean help
+.DEFAULT_GOAL := help
+
+demo:
+	@echo "### 1/2  MEASURE — audit a sample build + show its hardening plan"
+	@$(MAKE) -s -C harness/sample sample_dev
+	@python3 skill/carapace.py report harness/sample/sample_dev
+	@echo
+	@echo "### 2/2  PROVE — demonstrate every countermeasure firing"
+	@bash harness/verify/run_all.sh
+
+verify:
+	@bash harness/verify/run_all.sh
+
+audit:
+	@$(MAKE) -s -C harness/sample sample_dev
+	@python3 skill/carapace.py audit "$(BIN)"
+
+report:
+	@$(MAKE) -s -C harness/sample sample_dev
+	@python3 skill/carapace.py report "$(BIN)"
+
+clean:
+	@$(MAKE) -s -C harness/sample clean
+	@rm -f harness/verify/ptrace_attach_probe core core.*
+	@echo "cleaned."
+
+help:
+	@echo "Carapace — defensive anti-reverse-engineering hardening & audit harness"
+	@echo
+	@echo "  make demo     see it in ~30s (audit a sample, show the plan, prove the defenses)"
+	@echo "  make verify   run every verify slice and print one posture summary"
+	@echo "  make audit    BIN=<elf>   scored exposure report for your own binary"
+	@echo "  make report   BIN=<elf>   full audit + the ordered hardening plan"
+	@echo "  make clean    remove build artifacts"
+	@echo
+	@echo "Blue team only: audit/harden software you own or are authorized to protect."

@@ -28,18 +28,19 @@ harness/
            test_slice_b.sh                — identity transform measured + round-trips (18/18)
            test_slice_c.sh                — the drive-the-harness skill loop (9/9)
            test_slice_d.sh                — integrity/attestation + anti-Frida (16/16)
+           test_slice_e.sh                — the report one-shot / front door (7/7)
+           run_all.sh                     — run every slice, one posture summary
 ```
 
 The driver + skill that tie this together live in `../skill/` (Slice C): run the
-audit, read the posture, recommend/apply the next highest-value hardening.
+audit, read the posture, recommend/apply the next highest-value hardening. The
+repo-root `Makefile` is the front door (`make demo` / `make verify` / `make
+report BIN=…`).
 
-Prove the slices end-to-end:
+Prove everything in one command (from the repo root):
 
 ```
-bash harness/verify/test_slice_a.sh     # exit 0 = Slice A verified
-bash harness/verify/test_slice_b.sh     # exit 0 = Slice B verified
-bash harness/verify/test_slice_c.sh     # exit 0 = Slice C verified
-bash harness/verify/test_slice_d.sh     # exit 0 = Slice D verified
+make verify        # runs harness/verify/run_all.sh -> 65/65 across all five slices
 ```
 
 Each subdirectory has its own README (signals read, tiers, bypasses, how to run).

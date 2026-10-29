@@ -7,8 +7,12 @@ bash test_slice_a.sh        # Slice A: core-dump + anti-ptrace guards
 bash test_slice_b.sh        # Slice B: dev<->release identity transform
 bash test_slice_c.sh        # Slice C: the drive-the-harness skill loop
 bash test_slice_d.sh        # Slice D: integrity/attestation + anti-Frida
+bash test_slice_e.sh        # Slice E: the report one-shot (front door)
+
+bash run_all.sh             # run every slice, print ONE posture summary (= make verify)
 ```
-Exit 0 = all hard assertions passed.
+Exit 0 = all hard assertions passed. `run_all.sh` (what `make verify` calls from
+the repo root) runs all five slices and prints a single consolidated table.
 
 `test_slice_a.sh` builds the sample + the attach probe, then proves the three
 claims from `docs/STATE.md` on real binaries (mechanism-level, not vibes):
@@ -73,6 +77,15 @@ on-disk code):
 - **anti-Frida fires** — a clean process is clean (no false positive); a process
   carrying a `frida-agent` mapping + a `gum-js-loop` thread + a `:27042` listener
   is detected on all three signals.
+
+### Slice E — `test_slice_e.sh` (7/7)
+
+Covers the front-door `report` one-shot (`skill/carapace.py report`): it exits 0,
+renders the full audit **and** the ordered hardening plan in one call, every plan
+item carries a strength tier + a named bypass, the server-side-relocation Strong
+tier is surfaced, and it never overclaims ("unbreakable" appears only as a
+negation). Slice E adds no countermeasure — this just keeps the new skill code
+tested.
 
 **Honest scope:** these harnesses prove the countermeasures *fire*, the audit
 *detects/measures* them, and the skill *recommends honestly*. None claims
