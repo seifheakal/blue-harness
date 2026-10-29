@@ -70,7 +70,7 @@ PY
 
 # the human readout must carry the honest footer (never claims unbreakable)
 $CARA recommend "$WORK/target" > "$WORK/rec.txt" 2>&1
-grep -q "never makes software" "$WORK/rec.txt" && ok "human readout carries the honest no-overclaim footer" || bad "missing honest footer"
+grep -qi "nothing here is unbreakable" "$WORK/rec.txt" && ok "human readout carries the honest no-overclaim footer" || bad "missing honest footer"
 tier_top=$(python3 -c 'import json;print(json.load(open("'"$WORK"'/rec.json"))["recommendations"][0]["tier"])')
 echo "    top rec: identity-transform — tier: $tier_top"
 

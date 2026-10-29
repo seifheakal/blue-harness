@@ -211,8 +211,25 @@ def cmd_recommend(args):
     for r in recs:
         print(_fmt_rec(r))
         print()
-    print("  Honest footer: anti-RE raises an attacker's cost; it never makes software")
-    print("  unbreakable. The only Strong tier is moving the secret off the client.")
+    print("  Honest footer: nothing here is unbreakable — anti-RE only raises the")
+    print("  attacker's cost. The only Strong tier is moving the secret off the client.")
+    return 0
+
+
+def cmd_report(args):
+    """Full audit + the ordered hardening plan, in one call — the one-shot
+    readout for an operator or for the skill to relay."""
+    s = analyze(args.binary)
+    print(render(s))
+    print()
+    _, recs = recommend(args.binary, want_all=True)
+    print(f"Ordered hardening plan for {_rel(args.binary)} (highest value first):")
+    print()
+    for r in recs:
+        print(_fmt_rec(r))
+        print()
+    print("  Honest footer: nothing here is unbreakable — anti-RE only raises the")
+    print("  attacker's cost. The only Strong tier is moving the secret off the client.")
     return 0
 
 
@@ -251,6 +268,10 @@ def main(argv=None):
     a = sub.add_parser("audit", help="print the full exposure report")
     a.add_argument("binary")
     a.set_defaults(fn=cmd_audit)
+
+    rp = sub.add_parser("report", help="full audit + the ordered hardening plan, in one call")
+    rp.add_argument("binary")
+    rp.set_defaults(fn=cmd_report)
 
     r = sub.add_parser("recommend", help="the next highest-value hardening (honest tier + bypass)")
     r.add_argument("binary")
