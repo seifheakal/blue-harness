@@ -26,6 +26,9 @@ audit:
 	@$(MAKE) -s -C harness/sample sample_dev
 	@python3 skill/carapace.py audit "$(BIN)"
 
+audit-pe:
+	@python3 harness/audit/pe_exposure_audit.py "$(BIN)"
+
 report:
 	@$(MAKE) -s -C harness/sample sample_dev
 	@python3 skill/carapace.py report "$(BIN)"
@@ -41,6 +44,7 @@ help:
 	@echo "  make demo     see it in ~30s (audit a sample, show the plan, prove the defenses)"
 	@echo "  make verify   run every verify slice and print one posture summary"
 	@echo "  make audit    BIN=<elf>   scored exposure report for your own binary"
+	@echo "  make audit-pe BIN=<exe>   scored exposure report for a Windows PE"
 	@echo "  make report   BIN=<elf>   full audit + the ordered hardening plan"
 	@echo "  make clean    remove build artifacts"
 	@echo

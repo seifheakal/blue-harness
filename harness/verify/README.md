@@ -9,11 +9,12 @@ bash test_slice_c.sh        # Slice C: the drive-the-harness skill loop
 bash test_slice_d.sh        # Slice D: integrity/attestation + anti-Frida
 bash test_slice_e.sh        # Slice E: the report one-shot (front door)
 bash test_slice_f.sh        # Slice F: build-time string encryption
+bash test_slice_g.sh        # Slice G: PE/Windows exposure audit
 
 bash run_all.sh             # run every slice, print ONE posture summary (= make verify)
 ```
 Exit 0 = all hard assertions passed. `run_all.sh` (what `make verify` calls from
-the repo root) runs all six slices and prints a single consolidated table (75/75).
+the repo root) runs all seven slices and prints a single consolidated table (99/99).
 
 `test_slice_a.sh` builds the sample + the attach probe, then proves the three
 claims from `docs/STATE.md` on real binaries (mechanism-level, not vibes):
@@ -95,6 +96,16 @@ encrypted): every protected plaintext is present in the plain build's bytes and
 **entirely gone** from the encrypted build; both decode to identical, correct
 output at runtime; and the audit flips `string_encryption_present` and shows the
 string informativeness drop.
+
+### Slice G — `test_slice_g.sh` (24/24)
+
+Proves the **PE/Windows exposure audit** (`../audit/pe_exposure_audit.py`) on
+minimal PE32+ fixtures generated in-process by `../sample/pe_fixture.py` (no
+mingw/pefile needed): it parses format/machine and the import table (KERNEL32:
+CreateFileW, VirtualProtect, …); the DllCharacteristics flip soft→hard
+(ASLR/DEP/CFG/HighEntropyVA); it recovers a PDB path, reports Authenticode
+presence **as read-only / not verified**, flags a packer (UPX0 + high entropy),
+drops the exposure score soft(77)→hard(15), and rejects a non-PE gracefully.
 
 **Honest scope:** these harnesses prove the countermeasures *fire*, the audit
 *detects/measures* them, and the skill *recommends honestly*. None claims

@@ -15,8 +15,9 @@ declare -A WHAT=(
     [d]="code-integrity + server-nonce attestation + anti-Frida detector fire"
     [e]="the report one-shot renders the full audit + ordered plan, no overclaiming"
     [f]="build-time string encryption: plaintext gone from static view, correct at runtime"
+    [g]="PE/Windows exposure audit: DllCharacteristics, imports, PDB, Authenticode (read-only)"
 )
-ORDER="a b c d e f"
+ORDER="a b c d e f g"
 
 echo "=================================================================="
 echo "  Carapace — measure it, harden it, PROVE it"
