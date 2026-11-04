@@ -45,9 +45,10 @@ against **your own build** and does three things, audit-first:
 
 ## What's built so far
 
-Six implementation slices, each **audit → harden → verify**, every check green
-(`make verify` → 75/75). Every countermeasure is rated on an honest tier and
-ships with a **named bypass** — nothing here claims to be unbreakable.
+Seven implementation slices, each **audit → harden → verify**, every check green
+(`make verify` → 99/99). Every countermeasure is rated on an honest tier and
+ships with a **named bypass** — nothing here claims to be unbreakable. The audit
+reads both **Linux ELF** and **Windows PE** (`make audit-pe BIN=…`).
 
 | Countermeasure | Denies (the `rea` AI-RE agent) | Tier | Named bypass |
 |---|---|---|---|
@@ -88,7 +89,8 @@ Details and the attacker-weapon mapping: [`docs/re-techniques/rea.md`](docs/re-t
 engines from a single prompt — disassembler MCP servers, autonomous RE agents,
 LLM decompilers, AI Frida-hook generators. That's the headline threat; the
 classic tools are the substrate it rides on. The implemented slices currently
-target **native ELF on Linux**; the catalog and design cover the rest. See
+target **native ELF on Linux**, with a read-only **Windows PE** exposure audit
+(Slice G); the catalog and design cover the rest. See
 [`docs/re-techniques/_index.md`](docs/re-techniques/_index.md). Electron / web /
 JS / WebAssembly / pure-.NET are out of current scope.
 
@@ -117,8 +119,8 @@ each step.
 
 ## Status
 
-**Active — six verified slices (audit + six countermeasures + the driving
-skill), 75/75 checks green.** Roadmap in [`docs/STATE.md`](docs/STATE.md).
+**Active — seven verified slices (ELF + PE audit, six countermeasures, the
+driving skill), 99/99 checks green.** Roadmap in [`docs/STATE.md`](docs/STATE.md).
 
 ## License
 

@@ -5,7 +5,7 @@
 > pass work between chats without dumping context. Keep it short and current.
 
 - Last updated: 2026-10-26
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–F ✅) → Testing ✅ (75/75 via `make verify`) → Slice G ⬅ next**
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–G ✅) → Testing ✅ (99/99 via `make verify`) → Slice H ⬅ next**
 - Worked specimen: **`rea`** (morluto/rea, npm `rea-agents`) — the P0 reference.
 
 ## Done so far
@@ -139,22 +139,32 @@
   - Tier **Speed-bump→Meaningful**; named bypass (embedded key → recover at rest,
     or lift from memory at runtime) stated in-tool. Not a secret store.
 
-## Next step (decided)
-**Slice G — a second-format exposure audit (PE / Windows).** The harness is
-ELF-only, but Windows PE is the #1 commodity-cracking target (games, creative
-suites) and is in scope (CLAUDE.md §2). Extend the read-only scanner to PE: read
-the signals rea's `inspect_binary_layout`/`inspect_pe_load_config` read — imports/
-exports, string density, section entropy, DLL characteristics (ASLR/DYNAMICBASE,
-DEP/NX, CFG/GUARD, high-entropy-VA), Authenticode presence (read-only — does NOT
-verify), and .NET/packer tells — and emit the same scored, tiered posture. Verify
-on a committed minimal PE fixture (or a mingw cross-compile if available). Audit-
-first; no new countermeasure. Keep tiers honest (a signature's value is only in a
-runtime server-reported check, not its presence on disk — rea.md note).
+- **Implementation — Slice G ✅ (PE / Windows exposure audit).** Audit-first, no
+  new countermeasure:
+  - **Audit:** `harness/audit/pe_exposure_audit.py` — self-contained PE32/PE32+
+    parser (no `pefile`). Reads DllCharacteristics (ASLR/DEP/CFG/HighEntropyVA/SEH),
+    imports (RVA→offset mapped) + exports, section entropy, string density,
+    COFF-symbols + debug/PDB path, Authenticode presence (**read-only — does NOT
+    verify**, the honest note it prints), and .NET/packer tells; scored + tiered
+    like the ELF scanner. `make audit-pe BIN=…`.
+  - **Fixture:** `harness/sample/pe_fixture.py` — minimal valid PE32+ generator
+    (soft/hard/packed profiles) so verify needs no mingw.
+  - **Verify:** `harness/verify/test_slice_g.sh` (**24/24**) — format/machine +
+    import table parsed; DllCharacteristics flip soft→hard; PDB path recovered;
+    Authenticode read-only; packer (UPX0 + high entropy); score soft(77)→hard(15);
+    non-PE rejected gracefully. `make verify` now **99/99 across 7 slices**.
 
-**Follow-ons / parked:** a `.github/workflows` CI that runs `make verify`; a
-Mach-O audit pass; and the empirical AI-layer validation (decoy effectiveness,
-coverage-poisoning) that still needs the sandboxed, operator-owned `rea` VM — do
-not install offensive tooling in the dev container.
+## Next step (decided)
+**Slice H — CI that runs `make verify` on every push/PR.** The repo proves itself
+locally (99/99) but nothing enforces it on a change. Add `.github/workflows/
+verify.yml` (Ubuntu, gcc + python3, `make verify`) plus a status line/badge in the
+README so a regression in any slice fails visibly. Small, high-legibility, and it
+locks in the "prove it" guarantee for the CV/GitHub audience. No new countermeasure.
+
+**Follow-ons / parked:** a Mach-O audit pass (third format); wiring PE into the
+skill's `audit`/`report` dispatch by magic; and the empirical AI-layer validation
+(decoy effectiveness, coverage-poisoning) that still needs the sandboxed,
+operator-owned `rea` VM — do not install offensive tooling in the dev container.
 
 **Then / parked:** empirical AI-layer validation (decoy effectiveness,
 coverage-poisoning) still needs the sandboxed, operator-owned `rea` VM — do not

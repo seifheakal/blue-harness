@@ -86,6 +86,21 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 ## Contribution Log (append after every bit — newest at top)
 
 ### 2026-11-04
+- **Shipped Implementation Slice G (PE/Windows exposure audit, 24/24 green; 99/99
+  across all slices).** Broadened the harness beyond Linux ELF to the #1 commodity-
+  cracking target:
+  - Wrote a **self-contained PE32/PE32+ parser** (no `pefile`) that reads the
+    signals an AI-RE agent reads — DllCharacteristics (ASLR/DEP/CFG/high-entropy
+    ASLR), the import/export tables (with correct RVA→file-offset mapping), section
+    entropy, string density, debug/PDB paths, Authenticode presence, and .NET/
+    packer tells — and scores a tiered posture parallel to the ELF scanner.
+  - Kept the signature claim honest: an Authenticode signature on disk is reported
+    as **read-only / not verified** — its defensive value is only in a runtime,
+    server-checked signature.
+  - Made it testable with **zero toolchain**: a minimal PE32+ fixture generator
+    (soft/hard/packed) drives a 24-check verify proving the DllCharacteristics flip,
+    import parsing, PDB recovery, packer tell, score drop (77→15), and graceful
+    non-PE rejection.
 - **Shipped Implementation Slice F (build-time string encryption + runtime decode
   loader, 10/10 green; 75/75 across all slices).** Closed the last countermeasure
   the harness openly labelled "roadmap":
