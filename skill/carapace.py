@@ -130,18 +130,21 @@ def _rules(s, binpath):
                     "server nonce; not a substitute for keeping the secret server-side.",
         })
 
-    # 4. High plaintext-string density — free intel. ROADMAP (needs a loader).
-    if s["string_density"] >= 0.05:
+    # 4. High plaintext-string density — free intel. BUILD-TIME (Slice F).
+    if s["string_density"] >= 0.05 and not s["string_encryption_present"]:
         out.append({
             "id": "string-encryption",
-            "title": "Encrypt / decode-on-demand high-density plaintext strings",
-            "kind": "roadmap",
+            "title": "Encrypt live strings + decode on demand (removes them from a static view)",
+            "kind": "build-time",
             "weapon": "rea Cluster B/C (list_strings)",
             "tier": "Speed-bump→Meaningful",
-            "bypass": "Runtime key recovery via Frida/memory; decode-at-rest if the key is embedded.",
-            "command": "(not yet implemented in this harness — needs a runtime decode loader)",
-            "note": "Stated, not skipped. The identity transform's string-decoy pass covers only "
-                    "declared-internal, same-length strings, not live user-facing ones.",
+            "bypass": "The key is embedded — recover plaintext at rest (re-run the keystream) or "
+                      "lift the decoded string from memory at runtime (Frida/GDB).",
+            "command": "mark strings in a manifest, run harness/harden/carapace_string_encrypt.py gen, "
+                       "link harness/harden/carapace_strings.c and use carapace_cstr(id) (see harden/README.md)",
+            "note": "Compile-time. Not a secret store — a secret that truly can't leak belongs "
+                    "server-side. The identity transform's decoy pass covers internal strings; this "
+                    "covers live, used strings.",
         })
 
     # 5. Link hardening — raises effort, not a decompile blocker.
