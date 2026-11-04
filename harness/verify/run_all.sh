@@ -16,8 +16,9 @@ declare -A WHAT=(
     [e]="the report one-shot renders the full audit + ordered plan, no overclaiming"
     [f]="build-time string encryption: plaintext gone from static view, correct at runtime"
     [g]="PE/Windows exposure audit: DllCharacteristics, imports, PDB, Authenticode (read-only)"
+    [h]="CI wiring enforces 'make verify' on every push/PR (config lint; no new countermeasure)"
 )
-ORDER="a b c d e f g"
+ORDER="a b c d e f g h"
 
 echo "=================================================================="
 echo "  Carapace — measure it, harden it, PROVE it"

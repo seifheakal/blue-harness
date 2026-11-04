@@ -1,0 +1,58 @@
+# Carapace CI — the "prove it" guarantee, enforced on every change.
+#
+# Runs `make verify` (all slices, audit -> harden -> verify) on every push and
+# every pull request. A regression in any slice turns the badge red and fails
+# the check, so "99/99 green" can't silently rot.
+#
+# The harness has no external dependencies beyond a C toolchain + Python 3, both
+# already on ubuntu-latest. We add gdb (so Slice A's under-tracer detection
+# branch actually runs instead of skipping) and relax Yama ptrace_scope to 0 so
+# the anti-ptrace *control* assertion — a sibling probe attaching to the
+# unhardened baseline — can run as designed. Neither weakens the test: the
+# guards being proven are in the binary, not in the host policy.
+name: verify
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# A newer push to the same ref supersedes an in-flight run; PR runs are keyed
+# separately so they aren't cancelled by pushes to the source branch.
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    name: make verify (ELF + PE, 7 slices)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Record the toolchain Carapace is being proven against
+        run: |
+          set -eux
+          cc --version | head -1
+          make --version | head -1
+          python3 --version
+
+      - name: Install gdb (enables Slice A's under-tracer detection branch)
+        run: |
+          set -eux
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gdb
+
+      - name: Allow a sibling to ptrace the baseline (Slice A control)
+        # The anti-ptrace guard is proven by the HARDENED binary refusing attach;
+        # the baseline must stay attachable for that to be a real contrast. GitHub
+        # runners may ship Yama ptrace_scope=1 (descendants only), which would
+        # block the probe. Set it to 0; tolerate kernels without Yama.
+        run: sudo sysctl -w kernel.yama.ptrace_scope=0 || true
+
+      - name: make verify
+        run: make verify

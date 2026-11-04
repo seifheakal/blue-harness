@@ -6,6 +6,10 @@
   for <strong>native binaries and mobile apps</strong> you own.
 </p>
 
+<p align="center">
+  <a href="https://github.com/seifheakal/blue_team/actions/workflows/verify.yml"><img src="https://github.com/seifheakal/blue_team/actions/workflows/verify.yml/badge.svg" alt="verify status"></a>
+</p>
+
 ---
 
 ## Quickstart (see it in ~30 seconds)
@@ -45,8 +49,9 @@ against **your own build** and does three things, audit-first:
 
 ## What's built so far
 
-Seven implementation slices, each **audit → harden → verify**, every check green
-(`make verify` → 99/99). Every countermeasure is rated on an honest tier and
+Seven implementation slices, each **audit → harden → verify**, plus a CI gate
+that runs them all on every push and pull request — every check green
+(`make verify` → 108/108). Every countermeasure is rated on an honest tier and
 ships with a **named bypass** — nothing here claims to be unbreakable. The audit
 reads both **Linux ELF** and **Windows PE** (`make audit-pe BIN=…`).
 
@@ -120,7 +125,9 @@ each step.
 ## Status
 
 **Active — seven verified slices (ELF + PE audit, six countermeasures, the
-driving skill), 99/99 checks green.** Roadmap in [`docs/STATE.md`](docs/STATE.md).
+driving skill) plus a CI gate, 108/108 checks green and enforced in CI**
+([`make verify`](.github/workflows/verify.yml) runs on every push and pull
+request — the badge above is that gate). Roadmap in [`docs/STATE.md`](docs/STATE.md).
 
 ## License
 

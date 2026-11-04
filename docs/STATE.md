@@ -4,8 +4,8 @@
 > at the start and **updates it at the end** before handing off. This is how we
 > pass work between chats without dumping context. Keep it short and current.
 
-- Last updated: 2026-10-26
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–G ✅) → Testing ✅ (99/99 via `make verify`) → Slice H ⬅ next**
+- Last updated: 2026-11-04
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–H ✅) → Testing ✅ (108/108 via `make verify`, now enforced in CI) → Slice I ⬅ next**
 - Worked specimen: **`rea`** (morluto/rea, npm `rea-agents`) — the P0 reference.
 
 ## Done so far
@@ -154,17 +154,41 @@
     Authenticode read-only; packer (UPX0 + high entropy); score soft(77)→hard(15);
     non-PE rejected gracefully. `make verify` now **99/99 across 7 slices**.
 
-## Next step (decided)
-**Slice H — CI that runs `make verify` on every push/PR.** The repo proves itself
-locally (99/99) but nothing enforces it on a change. Add `.github/workflows/
-verify.yml` (Ubuntu, gcc + python3, `make verify`) plus a status line/badge in the
-README so a regression in any slice fails visibly. Small, high-legibility, and it
-locks in the "prove it" guarantee for the CV/GitHub audience. No new countermeasure.
+- **Implementation — Slice H ✅ (CI that enforces `make verify` on every
+  push/PR).** No new countermeasure — it locks in the "prove it" guarantee:
+  - **Workflow:** `.github/workflows/verify.yml` — Ubuntu runner, runs
+    `make verify` on every `push` (all branches) and every `pull_request`.
+    `concurrency` cancels superseded runs on the same ref; `permissions:
+    contents: read` (least privilege). Installs **gdb** so Slice A's under-tracer
+    detection branch runs (not skips), and sets `kernel.yama.ptrace_scope=0` so
+    Slice A's anti-ptrace *control* (a sibling probe attaching to the unhardened
+    baseline) works as designed. Neither weakens the test — the guards proven are
+    in the binary, not the host policy. The real-core end-to-end check in Slice A
+    self-skips on CI (apport `core_pattern`) and relies on its mechanism proof, as
+    designed.
+  - **Badge:** `README.md` carries the Actions status badge in the header and the
+    Status section now says the gate is CI-enforced.
+  - **Verify:** `harness/verify/test_slice_h.sh` (**9/9**) — a static *config lint*
+    (does not launch Actions): asserts the workflow exists, triggers on push +
+    pull_request, actually runs `make verify`, keeps both Slice-A accommodations
+    (gdb + ptrace_scope), pins the checkout action, runs on Ubuntu, and that the
+    README advertises the badge. So a future edit that silently drops the gate or
+    an accommodation is caught by `make verify` itself. Negative-tested: the lint
+    fails when the `make verify` step is removed.
+  - `make verify` now **108/108 across 8 slices**.
 
-**Follow-ons / parked:** a Mach-O audit pass (third format); wiring PE into the
-skill's `audit`/`report` dispatch by magic; and the empirical AI-layer validation
-(decoy effectiveness, coverage-poisoning) that still needs the sandboxed,
-operator-owned `rea` VM — do not install offensive tooling in the dev container.
+## Next step (decided)
+**Slice I — wire PE detection into the skill's `audit`/`report` dispatch by magic
+byte.** Slice G's PE scanner exists but is only reachable via `make audit-pe`;
+the skill (`skill/carapace.py`) and `make report` still assume ELF. Detect the
+format by magic (`\x7fELF` vs `MZ`/PE) and route to the right scanner so the
+driving skill and the front-door `report` cover both formats. Small, audit-first,
+no new countermeasure, no operator VM needed.
+
+**Follow-ons / parked:** a Mach-O audit pass (the third format, a larger
+audit-first slice); and the empirical AI-layer validation (decoy effectiveness,
+coverage-poisoning) that still needs the sandboxed, operator-owned `rea` VM — do
+not install offensive tooling in the dev container.
 
 **Then / parked:** empirical AI-layer validation (decoy effectiveness,
 coverage-poisoning) still needs the sandboxed, operator-owned `rea` VM — do not

@@ -86,6 +86,22 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 ## Contribution Log (append after every bit — newest at top)
 
 ### 2026-11-04
+- **Shipped Implementation Slice H (CI that enforces `make verify`, 9/9 green;
+  108/108 across all slices).** Turned the "prove it" claim from a local run into
+  an enforced gate:
+  - Added a **GitHub Actions workflow** (`.github/workflows/verify.yml`) that runs
+    the full `make verify` suite on every push and pull request, so a regression in
+    any of the eight slices fails the check and turns the README status badge red.
+  - Handled the two CI-environment subtleties honestly rather than weakening the
+    tests: installed **gdb** so Slice A's under-tracer detection branch actually
+    runs, and relaxed **Yama `ptrace_scope`** so the anti-ptrace *control* (a
+    sibling attaching to the unhardened baseline) runs as designed — the guards
+    being proven live in the binary, not the host policy. Scoped the workflow to
+    least privilege (`contents: read`) with superseded-run cancellation.
+  - Kept the gate self-checking: a **config-lint verify slice**
+    (`test_slice_h.sh`) asserts the workflow still runs `make verify` and still
+    carries both accommodations and the badge, and is negative-tested to fail when
+    the gate is removed — so the CI wiring can't silently rot.
 - **Shipped Implementation Slice G (PE/Windows exposure audit, 24/24 green; 99/99
   across all slices).** Broadened the harness beyond Linux ELF to the #1 commodity-
   cracking target:
