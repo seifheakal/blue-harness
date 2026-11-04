@@ -502,6 +502,10 @@ def analyze(path):
         ("carapace_antifrida_scan" in syms)
         or (b"gum-js-loop" in blob_lower) or (b"frida-agent" in blob_lower)
     )
+    # Build-time string encryption: the enc-mode marker symbol (a name, not a
+    # plaintext tell). The loader alone isn't enough — a plaintext build also
+    # links it; only the encrypted build carries this marker.
+    string_encryption_present = "carapace_strings_enc" in syms
 
     signals = {
         "file": os.path.basename(path),
@@ -522,6 +526,7 @@ def analyze(path):
         "antiptrace_guard_present": antiptrace_guard_present,
         "integrity_guard_present": integrity_guard_present,
         "antifrida_guard_present": antifrida_guard_present,
+        "string_encryption_present": string_encryption_present,
         "informativeness": informativeness(elf, str_target),
     }
     signals["score"], signals["tier"], signals["recommendation"] = score(signals)
@@ -643,6 +648,8 @@ def render(s):
              "   (vs rea Cluster G patch; server-nonce = →Strong)")
     L.append(f"    anti-Frida detector .... {yn(s['antifrida_guard_present'])}"
              "   (vs rea Cluster G Frida inject)")
+    L.append(f"    string encryption ...... {yn(s['string_encryption_present'])}"
+             "   (vs rea Cluster B/C list_strings)")
     L.append("")
     L.append("  Exposure drivers:")
     for r in s["recommendation"]["exposure_drivers"]:
