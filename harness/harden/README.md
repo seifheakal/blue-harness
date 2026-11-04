@@ -118,3 +118,33 @@ gadget, a non-default port, or an attacker who edits the signatures once found.
 
 `attest_server.py` — the reference server-side verifier (stdlib `hmac`/`hashlib`):
 `nonce` issues a challenge, `verify` accepts/rejects a client response.
+
+---
+
+## String encryption (Slice F) — vs rea Cluster B/C `list_strings`
+
+Removes **live, used** strings from a static `strings` / `list_strings` view by
+storing them encrypted and decoding on demand — complementing the identity
+transform's decoy pass (which only covers *internal* strings).
+
+- `carapace_string_encrypt.py gen --manifest M.json --mode {enc|plain} --out gen.h`
+  — build-time codegen. Reads `{ID: "plaintext"}`, emits C byte tables. The dev
+  tree keeps the manifest (clear); the shipped binary carries only ciphertext.
+- `carapace_strings.{c,h}` — the runtime loader: `carapace_cstr(id)` /
+  `carapace_cstr_into(id, out, cap)` decode on demand.
+
+```
+python3 carapace_string_encrypt.py gen --manifest secrets.json --mode enc --out carapace_strings_gen.h
+cc -DCARAPACE_GEN_HEADER='"carapace_strings_gen.h"' app.c carapace_strings.c
+# then in code:  printf("%s", carapace_cstr(CSTR_API_URL));
+```
+
+**Cipher:** a position-dependent **xorshift32 keystream** XOR (seeded per string
+id) — not a single-byte XOR that `strings`/entropy triage sees through. The Python
+encoder and the C loader run the identical keystream (round-trip proven in verify).
+
+**Tier:** *Speed-bump→Meaningful*. **Named bypass:** the key is embedded in the
+binary, so an attacker recovers plaintext **at rest** (re-run the keystream) or
+lifts the decoded string from **memory at runtime** (Frida/GDB). This raises cost
+against static/one-shot AI analysis; it is **not a secret store** — a secret that
+truly can't leak belongs server-side (the only Strong tier).

@@ -37,5 +37,21 @@ sample_attest: sample_attest.c $(HARDEN)/carapace_integrity.c $(HARDEN)/carapace
 		sample_attest.c $(HARDEN)/carapace_integrity.c $(HARDEN)/carapace_antifrida.c \
 		-lpthread -ldl
 
+# Slice F: build-time string encryption. One source, two builds from one manifest;
+# they differ only in the generated header (plaintext vs encrypted byte tables).
+GEN := ../harden/carapace_string_encrypt.py
+STRLOADER := $(HARDEN)/carapace_strings.c
+
+sample_strings_enc: sample_strings.c $(STRLOADER) $(HARDEN)/carapace_strings.h secret_strings.json
+	python3 $(GEN) gen --manifest secret_strings.json --mode enc --out carapace_strings_gen_enc.h
+	$(CC) -O1 -g -Wall -Wextra $(INCLUDE) -I. -DCARAPACE_GEN_HEADER='"carapace_strings_gen_enc.h"' \
+		-o $@ sample_strings.c $(STRLOADER)
+
+sample_strings_plain: sample_strings.c $(STRLOADER) $(HARDEN)/carapace_strings.h secret_strings.json
+	python3 $(GEN) gen --manifest secret_strings.json --mode plain --out carapace_strings_gen_plain.h
+	$(CC) -O1 -g -Wall -Wextra $(INCLUDE) -I. -DCARAPACE_GEN_HEADER='"carapace_strings_gen_plain.h"' \
+		-o $@ sample_strings.c $(STRLOADER)
+
 clean:
-	rm -f sample_baseline sample_hardened sample_dev sample_release_* sample_attest sample_attest_*
+	rm -f sample_baseline sample_hardened sample_dev sample_release_* sample_attest sample_attest_* \
+	      sample_strings_enc sample_strings_plain carapace_strings_gen_*.h

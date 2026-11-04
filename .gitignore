@@ -39,3 +39,6 @@ harness/sample/sample_dev
 harness/sample/sample_release_*
 harness/sample/sample_attest
 harness/sample/sample_attest_*
+harness/sample/sample_strings_enc
+harness/sample/sample_strings_plain
+harness/sample/carapace_strings_gen_*.h
