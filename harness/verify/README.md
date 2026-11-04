@@ -8,11 +8,12 @@ bash test_slice_b.sh        # Slice B: dev<->release identity transform
 bash test_slice_c.sh        # Slice C: the drive-the-harness skill loop
 bash test_slice_d.sh        # Slice D: integrity/attestation + anti-Frida
 bash test_slice_e.sh        # Slice E: the report one-shot (front door)
+bash test_slice_f.sh        # Slice F: build-time string encryption
 
 bash run_all.sh             # run every slice, print ONE posture summary (= make verify)
 ```
 Exit 0 = all hard assertions passed. `run_all.sh` (what `make verify` calls from
-the repo root) runs all five slices and prints a single consolidated table.
+the repo root) runs all six slices and prints a single consolidated table (75/75).
 
 `test_slice_a.sh` builds the sample + the attach probe, then proves the three
 claims from `docs/STATE.md` on real binaries (mechanism-level, not vibes):
@@ -86,6 +87,14 @@ item carries a strength tier + a named bypass, the server-side-relocation Strong
 tier is surfaced, and it never overclaims ("unbreakable" appears only as a
 negation). Slice E adds no countermeasure — this just keeps the new skill code
 tested.
+
+### Slice F — `test_slice_f.sh` (10/10)
+
+Proves build-time string encryption on two builds from one manifest (plaintext vs
+encrypted): every protected plaintext is present in the plain build's bytes and
+**entirely gone** from the encrypted build; both decode to identical, correct
+output at runtime; and the audit flips `string_encryption_present` and shows the
+string informativeness drop.
 
 **Honest scope:** these harnesses prove the countermeasures *fire*, the audit
 *detects/measures* them, and the skill *recommends honestly*. None claims

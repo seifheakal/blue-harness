@@ -14,8 +14,9 @@ declare -A WHAT=(
     [c]="the skill drives audit->recommend->apply honestly (tier + bypass on every item)"
     [d]="code-integrity + server-nonce attestation + anti-Frida detector fire"
     [e]="the report one-shot renders the full audit + ordered plan, no overclaiming"
+    [f]="build-time string encryption: plaintext gone from static view, correct at runtime"
 )
-ORDER="a b c d e"
+ORDER="a b c d e f"
 
 echo "=================================================================="
 echo "  Carapace — measure it, harden it, PROVE it"
