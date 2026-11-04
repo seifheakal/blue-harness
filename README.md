@@ -45,8 +45,8 @@ against **your own build** and does three things, audit-first:
 
 ## What's built so far
 
-Five implementation slices, each **audit → harden → verify**, every check green
-(`make verify` → 65/65). Every countermeasure is rated on an honest tier and
+Six implementation slices, each **audit → harden → verify**, every check green
+(`make verify` → 75/75). Every countermeasure is rated on an honest tier and
 ships with a **named bypass** — nothing here claims to be unbreakable.
 
 | Countermeasure | Denies (the `rea` AI-RE agent) | Tier | Named bypass |
@@ -54,6 +54,7 @@ ships with a **named bypass** — nothing here claims to be unbreakable.
 | **Core-dump suppression** | Cluster E — crash-core memory reads | Speed-bump | Attacker re-enables cores on their host; reads live memory via Frida/GDB |
 | **Anti-ptrace / anti-debug** | Cluster G/H — Frida attach + GDB | Meaningful | Frida hooks the check; spawn-paused loads a bypass first |
 | **Dev↔release identity transform** (strip / map / **decoy**) | Cluster B/C + the AI layer — names/strings the agent reasons from | Speed-bump→Meaningful | Behavioral cross-check (xrefs/value-flow) ignores names |
+| **String encryption** (decode-on-demand loader) | Cluster B/C — `list_strings` on live strings | Speed-bump→Meaningful | Embedded key → recover at rest; lift decoded string from memory |
 | **Anti-Frida detector** (maps / thread / port) | Cluster G — Frida inject | Meaningful | Stealth modes, renamed gadget, non-default port |
 | **Code-integrity + server-nonce attestation** | Cluster G — patch a hot function | Meaningful→**Strong** (server-tied) | Sustained live hook; client key is extractable (trust rests on the server nonce) |
 
@@ -116,8 +117,8 @@ each step.
 
 ## Status
 
-**Active — five verified slices (audit + five countermeasures + the driving
-skill), 65/65 checks green.** Roadmap in [`docs/STATE.md`](docs/STATE.md).
+**Active — six verified slices (audit + six countermeasures + the driving
+skill), 75/75 checks green.** Roadmap in [`docs/STATE.md`](docs/STATE.md).
 
 ## License
 

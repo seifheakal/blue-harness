@@ -5,7 +5,7 @@
 > pass work between chats without dumping context. Keep it short and current.
 
 - Last updated: 2026-10-26
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–E ✅) → Testing ✅ (65/65 via `make verify`) → Slice F ⬅ next**
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–F ✅) → Testing ✅ (75/75 via `make verify`) → Slice G ⬅ next**
 - Worked specimen: **`rea`** (morluto/rea, npm `rea-agents`) — the P0 reference.
 
 ## Done so far
@@ -119,23 +119,42 @@
   - **Verify:** `harness/verify/test_slice_e.sh` (**7/7**) covers the `report`
     one-shot (audit+plan, tier+bypass on every item, no overclaiming).
 
+- **Implementation — Slice F ✅ (build-time string encryption + runtime decode
+  loader).** Closed the one gap the skill labelled *roadmap*:
+  - **Harden:** `harness/harden/carapace_string_encrypt.py` (codegen: manifest →
+    encrypted C byte tables, position-dependent xorshift32 keystream, enc|plain
+    modes) + `harness/harden/carapace_strings.{c,h}` (runtime decode-on-demand
+    loader, byte-identical keystream). Manifest `harness/sample/secret_strings.json`
+    is the dev source of truth; the shipped binary carries only ciphertext.
+  - **Audit:** `string_encryption_present` (enc-mode marker symbol — a name, not a
+    plaintext tell) in the guards section.
+  - **Sample:** `harness/sample/sample_strings.c` — one source, two builds
+    (plaintext vs encrypted) from the one manifest, referencing CSTR_* ids only.
+  - **Verify:** `harness/verify/test_slice_f.sh` (**10/10**) — every plaintext is
+    in the plain build's bytes and **entirely gone** from the encrypted build;
+    both decode to identical correct output at runtime; audit flips + string
+    informativeness drops (7→3, density 0.60→0.10).
+  - **Skill:** string-encryption rule promoted from `roadmap` to `build-time` with
+    the real command; not recommended when already present.
+  - Tier **Speed-bump→Meaningful**; named bypass (embedded key → recover at rest,
+    or lift from memory at runtime) stated in-tool. Not a secret store.
+
 ## Next step (decided)
-**Slice F — string encryption with a runtime decode loader.** This closes the one
-gap the skill currently labels *roadmap / not yet implemented*: the audit already
-scores plaintext-string density, but we only decoy declared-internal strings. Add
-a build-time pass that encrypts selected string literals and a tiny runtime
-decode-on-demand loader so they are **absent from a static `strings`/`list_strings`
-view** but correct at runtime. Audit: string-density drops + "encrypted-strings
-present?"; harden: encrypt + loader (reuse the Slice-D SHA/XOR or a keystream);
-verify: target strings gone from static view, app prints them correctly, density
-drops. Tier **Speed-bump→Meaningful**; named bypass: runtime key recovery via
-Frida/memory, or decode-at-rest if the key is embedded. Then drop the "roadmap"
-label in `skill/carapace.py`.
+**Slice G — a second-format exposure audit (PE / Windows).** The harness is
+ELF-only, but Windows PE is the #1 commodity-cracking target (games, creative
+suites) and is in scope (CLAUDE.md §2). Extend the read-only scanner to PE: read
+the signals rea's `inspect_binary_layout`/`inspect_pe_load_config` read — imports/
+exports, string density, section entropy, DLL characteristics (ASLR/DYNAMICBASE,
+DEP/NX, CFG/GUARD, high-entropy-VA), Authenticode presence (read-only — does NOT
+verify), and .NET/packer tells — and emit the same scored, tiered posture. Verify
+on a committed minimal PE fixture (or a mingw cross-compile if available). Audit-
+first; no new countermeasure. Keep tiers honest (a signature's value is only in a
+runtime server-reported check, not its presence on disk — rea.md note).
 
 **Follow-ons / parked:** a `.github/workflows` CI that runs `make verify`; a
-second-format audit pass (PE or Mach-O); and the empirical AI-layer validation
-(decoy effectiveness, coverage-poisoning) that still needs the sandboxed,
-operator-owned `rea` VM — do not install offensive tooling in the dev container.
+Mach-O audit pass; and the empirical AI-layer validation (decoy effectiveness,
+coverage-poisoning) that still needs the sandboxed, operator-owned `rea` VM — do
+not install offensive tooling in the dev container.
 
 **Then / parked:** empirical AI-layer validation (decoy effectiveness,
 coverage-poisoning) still needs the sandboxed, operator-owned `rea` VM — do not

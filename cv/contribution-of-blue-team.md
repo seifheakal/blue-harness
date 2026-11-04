@@ -85,6 +85,24 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 
 ## Contribution Log (append after every bit — newest at top)
 
+### 2026-11-04
+- **Shipped Implementation Slice F (build-time string encryption + runtime decode
+  loader, 10/10 green; 75/75 across all slices).** Closed the last countermeasure
+  the harness openly labelled "roadmap":
+  - Built a **build-time codegen pass** that encrypts marked strings into C byte
+    tables with a position-dependent **xorshift32 keystream** (not a trivial
+    single-byte XOR), plus a tiny **runtime decode-on-demand loader** whose
+    keystream is byte-identical to the encoder — so live, used strings are
+    **entirely absent from a static `strings`/`list_strings` view** yet correct
+    in-process. The dev tree keeps the plaintext manifest; the binary ships only
+    ciphertext.
+  - Extended the audit to detect it and demonstrated the measured drop (string
+    informativeness 7→3, density 0.60→0.10), wired it into the skill's
+    recommendation policy (now a real build-time step, not a placeholder).
+  - Kept it honest: tiered Speed-bump→Meaningful with the embedded-key bypass
+    named (recover at rest, or lift from memory at runtime), and stated plainly
+    that it is not a secret store — that still belongs server-side.
+
 ### 2026-10-29
 - **Shipped Implementation Slice E (public front door + one-command demo, 7/7
   green; 65/65 across all slices).** Made the "measure it, harden it, prove it"
