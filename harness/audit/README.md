@@ -1,9 +1,24 @@
-# harness/audit — ELF exposure scanner (read-only)
+# harness/audit — exposure scanners (read-only)
 
-`elf_exposure_audit.py` — measures a single Linux ELF's RE-resistance posture by
-reading the **same signals an AI-assisted RE agent (e.g. `rea`) reads** from its
-static inspectors, and scores them. It never modifies the target (audit before
-harden, CLAUDE.md §8).
+Two self-contained scanners (no external deps), one per native format. Each reads
+the **same signals an AI-assisted RE agent (e.g. `rea`) reads** from its static
+inspectors and scores them; neither modifies the target (audit before harden,
+CLAUDE.md §8).
+
+- `elf_exposure_audit.py` — Linux **ELF** (the implemented countermeasures target
+  this format).
+- `pe_exposure_audit.py` — Windows **PE** (Slice G): DllCharacteristics
+  (ASLR/DEP/CFG/HighEntropyVA), imports/exports, section entropy, string density,
+  debug/PDB path, Authenticode presence (**read-only — does NOT verify**),
+  .NET/packer tells. `python3 pe_exposure_audit.py file.exe [--json]`. The honest
+  note it prints: an Authenticode signature on disk is not itself a defense — rea
+  only *reads* it; value comes from a runtime, server-checked signature.
+
+## `elf_exposure_audit.py`
+
+Measures a single Linux ELF's RE-resistance posture by reading the **same signals
+an AI-assisted RE agent (e.g. `rea`) reads** from its static inspectors, and
+scores them. It never modifies the target (audit before harden, CLAUDE.md §8).
 
 ```
 python3 elf_exposure_audit.py <binary>          # human report
