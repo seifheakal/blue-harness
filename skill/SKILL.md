@@ -23,6 +23,11 @@ python3 skill/carapace.py install    [--user|--dir DIR]    # symlink the skill i
 
 ## The loop (audit-first — never skip the audit)
 
+   The front door **auto-detects the format by magic byte**: `audit`/`report`/
+   `recommend` route a **Linux ELF** or a **Windows PE** to the right scanner (an
+   unrecognized file errors cleanly). The post-build `apply`/`harden` transforms
+   are ELF-only and will **refuse** a non-ELF rather than mangle it.
+
 1. **Audit.** Run `carapace audit <binary>`. It reports the exposure score, the
    posture tier, the signals an AI-assisted RE agent (e.g. `rea`) reads for free
    (symbols/debug, string density, section entropy, hardening flags, Go/Rust/

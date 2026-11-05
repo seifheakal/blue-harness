@@ -51,12 +51,13 @@ against **your own build** and does three things, audit-first:
 
 ## What's built so far
 
-Eleven implementation slices, each **audit → harden → verify**, plus a CI gate
+Twelve implementation slices, each **audit → harden → verify**, plus a CI gate
 that runs them all on every push and pull request — every check green
-(`make verify` → 174/174). The **eight countermeasures** below are each rated on
+(`make verify` → 187/187). The **eight countermeasures** below are each rated on
 an honest tier and ship with a **named bypass** — nothing here claims to be
 unbreakable. One command applies every post-build pass (`make harden BIN=…`); the
-audit reads both **Linux ELF** and **Windows PE** (`make audit-pe BIN=…`).
+audit **auto-detects the format by magic byte** and reads both **Linux ELF** and
+**Windows PE** (`carapace audit <bin>` routes either way).
 
 | Countermeasure | Denies (the `rea` AI-RE agent) | Tier | Named bypass |
 |---|---|---|---|
@@ -156,11 +157,12 @@ check, not evidence a defense fired. Carapace is the opposite trade:
 
 ## Status
 
-**Active — eleven verified slices (ELF + PE audit, eight countermeasures, the
-driving skill with a one-command `harden`, a digest-sealed CrackMe + honest
-empirical scorer) plus a CI gate, 174/174 checks green and enforced in CI**
-([`make verify`](.github/workflows/verify.yml) runs on every push and pull
-request — the badge above is that gate). Roadmap in [`docs/STATE.md`](docs/STATE.md).
+**Active — twelve verified slices (ELF + PE audit with magic-byte dispatch, eight
+countermeasures, the driving skill with a one-command `harden`, a digest-sealed
+CrackMe + honest empirical scorer) plus a CI gate, 187/187 checks green and
+enforced in CI** ([`make verify`](.github/workflows/verify.yml) runs on every push
+and pull request — the badge above is that gate). Roadmap in
+[`docs/STATE.md`](docs/STATE.md).
 
 ## License
 

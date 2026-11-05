@@ -39,7 +39,8 @@ EXHAUST = os.path.join(HARDEN_DIR, "carapace_exhaust.py")
 HONEY = os.path.join(HARDEN_DIR, "carapace_honeytokens.py")
 
 sys.path.insert(0, AUDIT_DIR)
-from elf_exposure_audit import analyze, render  # noqa: E402
+from elf_exposure_audit import analyze, render  # noqa: E402  (ELF: analyze/render)
+import pe_exposure_audit as pe_audit            # noqa: E402  (PE: analyze/render/recommend)
 
 
 def _rel(p):
@@ -47,6 +48,46 @@ def _rel(p):
         return os.path.relpath(p, REPO)
     except ValueError:
         return p
+
+
+# ---- format dispatch (route by magic byte) --------------------------------
+_MACHO_MAGICS = {
+    b"\xfe\xed\xfa\xce", b"\xce\xfa\xed\xfe",   # 32-bit (BE/LE)
+    b"\xfe\xed\xfa\xcf", b"\xcf\xfa\xed\xfe",   # 64-bit (BE/LE)
+    b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca",   # fat / universal
+}
+
+
+def _detect_format(path):
+    """ELF / PE / Mach-O by magic, so one `audit`/`report` front door covers all."""
+    with open(path, "rb") as f:
+        head = f.read(4)
+    if head[:4] == b"\x7fELF":
+        return "elf"
+    if head[:2] == b"MZ":
+        return "pe"
+    if head in _MACHO_MAGICS:
+        return "macho"
+    return "unknown"
+
+
+# Mach-O scanner is wired lazily so the ELF/PE path never pays its import cost
+# and the skill still works if it isn't present yet.
+def _macho_audit():
+    import importlib
+    return importlib.import_module("macho_exposure_audit")
+
+
+_SERVER_TRUTH = (
+    "  The only Strong tier is format-independent: relocate secrets & trust "
+    "decisions\n  server-side — what the client never holds can't be reversed "
+    "(CLAUDE.md §3).")
+
+
+def _nonelf_note(fmt):
+    return (f"  Note: this audit covers {fmt.upper()}. The harness's apply/harden "
+            "countermeasures\n  currently target ELF; for other formats the audit is "
+            "read-only today.\n" + _SERVER_TRUTH)
 
 
 # ---- recommendation policy (ordered, highest value first) ----------------
@@ -234,12 +275,43 @@ def _fmt_rec(r):
     return "\n".join(L)
 
 
+def _unknown(path):
+    raise ValueError(f"unrecognized format (not ELF/PE/Mach-O): {_rel(path)}")
+
+
 def cmd_audit(args):
-    print(render(analyze(args.binary)))
+    fmt = _detect_format(args.binary)
+    if fmt == "elf":
+        print(render(analyze(args.binary)))
+    elif fmt == "pe":
+        print(pe_audit.render(pe_audit.analyze(args.binary)))
+    elif fmt == "macho":
+        m = _macho_audit()
+        print(m.render(m.analyze(args.binary)))
+    else:
+        _unknown(args.binary)
     return 0
 
 
 def cmd_recommend(args):
+    fmt = _detect_format(args.binary)
+    if fmt in ("pe", "macho"):
+        if fmt == "pe":
+            s = pe_audit.analyze(args.binary)
+            line = pe_audit.recommend(s)
+        else:
+            m = _macho_audit()
+            s = m.analyze(args.binary)
+            line = m.recommend(s)
+        print(f"Carapace — next hardening for {_rel(args.binary)} [{fmt.upper()}]")
+        print(f"  exposure score {s['score']}/100 — {s['tier']}")
+        print()
+        print(f"  {line}")
+        print()
+        print(_nonelf_note(fmt))
+        return 0
+    if fmt != "elf":
+        _unknown(args.binary)
     s, recs = recommend(args.binary, want_all=args.all)
     if args.json:
         print(json.dumps({"score": s["score"], "tier": s["tier"], "recommendations": recs}, indent=2))
@@ -257,7 +329,20 @@ def cmd_recommend(args):
 
 def cmd_report(args):
     """Full audit + the ordered hardening plan, in one call — the one-shot
-    readout for an operator or for the skill to relay."""
+    readout for an operator or for the skill to relay. ELF gets the full plan;
+    PE/Mach-O get the format's read-only audit + the server-side truth."""
+    fmt = _detect_format(args.binary)
+    if fmt in ("pe", "macho"):
+        if fmt == "pe":
+            print(pe_audit.render(pe_audit.analyze(args.binary)))
+        else:
+            m = _macho_audit()
+            print(m.render(m.analyze(args.binary)))
+        print()
+        print(_nonelf_note(fmt))
+        return 0
+    if fmt != "elf":
+        _unknown(args.binary)
     s = analyze(args.binary)
     print(render(s))
     print()
@@ -273,6 +358,12 @@ def cmd_report(args):
 
 
 def cmd_apply(args):
+    fmt = _detect_format(args.binary)
+    if fmt != "elf":
+        print(f"carapace: apply targets ELF; {_rel(args.binary)} is {fmt.upper()}.")
+        print("  The post-build transforms (identity/exhaust/honeytokens) are ELF-only today;")
+        print("  run `carapace audit` for the read-only posture, and keep secrets server-side.")
+        return 3
     s, recs = recommend(args.binary, want_all=False)
     top = recs[0]
     print(f"Top recommendation: {top['title']}  [{top['kind']}]")
@@ -306,6 +397,12 @@ def cmd_harden(args):
     import tempfile
     import shutil as _sh
     binary = args.binary
+    fmt = _detect_format(binary)
+    if fmt != "elf":
+        print(f"carapace: harden targets ELF; {_rel(binary)} is {fmt.upper()}.")
+        print("  The post-build passes (identity/exhaust/honeytokens) are ELF-only today;")
+        print("  run `carapace audit` for the read-only posture, and keep secrets server-side.")
+        return 3
     out = args.out or (binary + ".hardened")
     s = analyze(binary)
 
@@ -466,7 +563,7 @@ def main(argv=None):
     args = ap.parse_args(argv)
     try:
         return args.fn(args)
-    except (FileNotFoundError, IsADirectoryError) as e:
+    except (FileNotFoundError, IsADirectoryError, ValueError, pe_audit.PEError) as e:
         print(f"carapace error: {e}", file=sys.stderr)
         return 2
 

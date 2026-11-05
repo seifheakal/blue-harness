@@ -5,7 +5,7 @@
 > pass work between chats without dumping context. Keep it short and current.
 
 - Last updated: 2026-11-05
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–L ✅) → Testing ✅ (174/174 via `make verify`, enforced in CI) → absorption plan COMPLETE; open items are operator decisions (see below)**
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–M ✅) → Testing ✅ (187/187 via `make verify`, enforced in CI) → format reach: PE dispatch done (M); Mach-O audit (N) ⬅ next**
 - Competitive scan done (2026-11-05): `research/findings/2026-11-05-competitive-landscape.md`
   — peers now defend against AI-RE (BLA ~2.3k★ the serious one). Operator decision:
   **absorb their good ideas into Carapace** ("engulf"), keeping our native-depth +
@@ -264,6 +264,22 @@
     multiplier from real inputs, "not measured" on absent data, readiness state) —
     explicitly **not** the effectiveness claim, which only the VM run yields.
 
+- **Implementation — Slice M ✅ (format dispatch; PE reach; 13/13; now 187/187
+  across 13 slices).** The Slice-G PE scanner was only reachable via
+  `make audit-pe`; now the skill detects the format by magic byte and routes the
+  one front door:
+  - **Skill:** `_detect_format` (ELF `\x7fELF` / PE `MZ` / Mach-O magics) drives
+    `carapace audit`/`report`/`recommend` to the right scanner; PE renders the PE
+    audit + the format-independent server-side Strong truth. `apply`/`harden`
+    **refuse** a non-ELF with guidance (rc 3) rather than mangling it — the ELF
+    transforms are not pretended onto a PE. Unknown blobs error cleanly (rc 2, no
+    traceback).
+  - **Verify:** `harness/verify/test_slice_m.sh` (**13/13**) — audit routes ELF→ELF
+    and PE→PE; PE report carries the audit + server-side truth and no ELF-only
+    hardening; apply/harden refuse a PE and leave it byte-identical; ELF path
+    unregressed; unsupported blob handled cleanly. Mach-O magic is already detected
+    (wired lazily) — the scanner itself lands in Slice N.
+
 ## Status: absorption plan complete
 Every in-scope idea from the competitive scan is now folded in and
 mechanism-proven: **I** (exhaust), **J** (poison/honeytokens), **K** (empirical
@@ -277,9 +293,9 @@ are **operator decisions / operator-gated actions**, not pending build work.
    Wasm/.NET = a **CLAUDE.md §2 change**. Recommendation unchanged: keep the
    mechanism-proven native core; add a web/bundle track only as an explicit,
    separately-tiered second track, never silently. Confirm before any such work.
-3. **PE/Mach-O reach** (in-scope, no VM, small): route the skill's `audit`/`report`
-   to the PE scanner by magic byte; then a Mach-O audit pass (third format). A good
-   next build increment if the operator wants to keep going without the VM.
+3. **PE/Mach-O reach** (in-scope, no VM): PE dispatch ✅ (Slice M). **Next: Slice N
+   — a Mach-O audit scanner** (third format) + a toolchain-free fixture, then flip
+   the skill's already-wired Mach-O branch to use it. The in-flight build item.
 
 ## Roadmap — absorbed from the competitive scan (ordered)
 - **Slice I — Exhaust** — ✅ done.

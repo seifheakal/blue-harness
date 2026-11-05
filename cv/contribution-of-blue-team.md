@@ -86,6 +86,14 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 ## Contribution Log (append after every bit — newest at top)
 
 ### 2026-11-05
+- **Shipped Implementation Slice M (format dispatch, 13/13 green; 187/187 across
+  13 slices).** Unified the audit front door across formats: the skill now detects
+  ELF / PE / Mach-O by magic byte and routes `audit`/`report`/`recommend` to the
+  right scanner, so the Windows-PE audit (built in Slice G) is reachable through
+  the same `carapace audit <bin>` an operator already uses for ELF. Kept it honest
+  — the ELF-only post-build transforms (`apply`/`harden`) **refuse** a non-ELF with
+  guidance and leave it untouched rather than pretending, and an unrecognized file
+  errors cleanly. The server-side Strong truth is surfaced regardless of format.
 - **Shipped Implementation Slice K (empirical harness + CrackMe + honest scorer,
   plumbing 20/20 green; 174/174 across 12 slices).** Built the apparatus to put
   *measured* numbers on the hardening — the empirical claim the competitive space

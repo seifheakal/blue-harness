@@ -21,8 +21,9 @@ declare -A WHAT=(
     [j]="honeytokens/canaries: plausible decoy secrets poison + attribute, provably inert"
     [k]="empirical CrackMe + honest scorer plumbing (effectiveness run is operator-VM-gated)"
     [l]="one-command 'carapace harden' applies every post-build pass; honest skill install"
+    [m]="skill routes audit/report by magic byte (ELF/PE); apply/harden refuse non-ELF honestly"
 )
-ORDER="a b c d e f g h i j k l"
+ORDER="a b c d e f g h i j k l m"
 
 echo "=================================================================="
 echo "  Carapace — measure it, harden it, PROVE it"
