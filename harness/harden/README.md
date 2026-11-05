@@ -182,3 +182,41 @@ transform: exhaust **after** decoying so the surface stays plausible.
 
 Proof it fires + is non-breaking (runtime byte-identical, exports intact, decoys
 non-alloc, no `.dynsym` pollution): `../verify/test_slice_i.sh`.
+
+---
+
+## Honeytokens / canaries (Slice J) — Poison + Hallucinate + attribution
+
+Plants **plausible, format-valid fake secrets** (AWS-style keys, bearer tokens,
+internal URLs, DB creds) so a naive AI-RE agent mines them and reports them as
+real **findings** — poisoning its output and, per Quarkslab's observation that
+agents confidently report plausible-but-wrong results, amplifying a
+**hallucinated** conclusion the attacker then wastes time on. Every token is
+**unique per build** and recorded in a **private ledger**, so it is also an
+**attribution tripwire**: if one surfaces in a leaked crack, `check` matches it
+back to the exact build.
+
+```
+python3 carapace_honeytokens.py plant sample_dev sample_dev.honey \
+        --ledger private_ledger.json --count 10 --build-tag 2026-11-05-rc1
+python3 carapace_honeytokens.py check --ledger private_ledger.json --input leak.txt
+```
+
+Placement: a **non-allocated** section (default `.carapace_honey`) — never mapped
+at runtime, so the program is byte-identical and the tokens are provably
+unreferenced decoys, yet still visible to a whole-file `strings` / `list_strings`
+scan (the naive agent's mining path). Deterministic (seeded) for reproducible
+builds + ledger.
+
+**Tier:** *Speed-bump* as poison / time-waste (a careful analyst xref-validates a
+"secret" and discards one nothing references); **Meaningful FOR DETECTION** as an
+attribution tripwire — a unique token leaking is strong evidence the build was
+reversed and names which build, but it is after-the-fact, **never prevention**.
+**Named bypass:** behavioural validation drops unreferenced tokens; the default
+section name is a tell (rename/randomise with `--section` for production; the
+strongest blend is compiling decoys into real `.rodata` at build time — a
+follow-on). A honeytoken is **not** a real secret.
+
+Keep the ledger **PRIVATE** (out of the shipped artifact) — it is the key that
+makes attribution work. Proof it fires + is non-breaking + attribution/uniqueness:
+`../verify/test_slice_j.sh`.

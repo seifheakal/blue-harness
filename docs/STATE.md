@@ -5,7 +5,7 @@
 > pass work between chats without dumping context. Keep it short and current.
 
 - Last updated: 2026-11-05
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–I ✅) → Testing ✅ (122/122 via `make verify`, enforced in CI) → Slice J (poison/hallucinate depth) ⬅ next**
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–J ✅) → Testing ✅ (137/137 via `make verify`, enforced in CI) → Slice K (empirical + CrackMe, operator-gated) ⬅ next**
 - Competitive scan done (2026-11-05): `research/findings/2026-11-05-competitive-landscape.md`
   — peers now defend against AI-RE (BLA ~2.3k★ the serious one). Operator decision:
   **absorb their good ideas into Carapace** ("engulf"), keeping our native-depth +
@@ -202,17 +202,43 @@
     the commodity path; Trivial vs anyone who filters). Named bypass: filter to
     SHF_ALLOC sections + code-referenced symbols. COST, not prevention.
 
+- **Implementation — Slice J ✅ (honeytokens / canaries; Poison + attribution;
+  15/15; now 137/137 across 10 slices).** The Poison/Hallucinate play, our way:
+  - **Harden:** `harness/harden/carapace_honeytokens.py` — `plant` drops N
+    plausible, format-valid FAKE secrets (AWS-style keys, bearer tokens, internal
+    URLs, DB creds) into a non-alloc section (default `.carapace_honey`; never
+    mapped → byte-identical runtime, provably unreferenced decoys) yet
+    strings-visible, and writes a **private ledger** (unique token values per
+    build). `check` matches a leaked token back to its exact build (canary).
+    Deterministic (seeded).
+  - **Audit:** `honeytokens_present` + `honeytoken_count` (guards section).
+  - **Skill:** `honeytokens` recommendation (post-build; tier + named bypass +
+    keep-ledger-private note).
+  - **Verify:** `harness/verify/test_slice_j.sh` (**15/15**) — audit flips+counts;
+    tokens unique + plausible (AKIA shape) + strings-visible; runtime
+    byte-identical, app runs, `.dynsym` untouched, honey section proven non-alloc;
+    attribution hits a leak (rc=7) + no false positive + unique per build;
+    deterministic.
+  - Tier **Speed-bump** (poison / time-waste) / **Meaningful FOR DETECTION**
+    (attribution). Named bypass: xref-validate drops unreferenced tokens; the
+    default section name is a tell (rename for production). Detects/attributes a
+    crack — does not prevent it.
+
 ## Next step (decided)
-**Slice J — Poison/Hallucinate depth.** Extend the decoy transform (Slice B) with
-honey-metadata + decoy control-flow/notes; fold Quarkslab's "agents fabricate
-plausible-but-wrong output" insight (a correct-*looking* answer ≠ real analysis).
-In scope, no VM. Audit→harden→verify as usual; honest tier + named bypass.
+**Slice K — Empirical validation + CrackMe.** ⚠ **operator-gated** — this is the
+one on the roadmap that needs your action. Stand up a throwaway, **operator-owned
+`rea` VM** (sandboxed) and measure, for real, how much the decoy/exhaust/honeytoken
+slices degrade an actual agent run (decoy-contradiction surfacing, context/token
+cost, honeytoken surfacing) — producing *measured* numbers or none (no vendor-style
+"internal estimate" multipliers). Ship a **Carapace CrackMe** built from our sample
++ slices, publishing only digests. Do **not** install offensive tooling in this dev
+container — this slice is blocked until the operator provides the VM. Until then,
+Slice L (one-command `carapace harden .` + MCP/skill install parity) is the best
+in-scope, no-VM next move.
 
 ## Roadmap — absorbed from the competitive scan (ordered)
-- **Slice I — Exhaust** — ✅ done (above).
-- **Slice J — Poison/Hallucinate depth** — ⬅ next. Extend the decoy transform (Slice B)
-  with honey-metadata + decoy control-flow notes; fold Quarkslab's "agents
-  fabricate plausible-but-wrong output" insight. In scope, no VM.
+- **Slice I — Exhaust** — ✅ done.
+- **Slice J — Poison/Hallucinate depth (honeytokens/canaries)** — ✅ done.
 - **Slice K — Empirical validation + CrackMe** — ⚠ **operator-gated**: needs a
   throwaway, operator-owned `rea` VM to measure decoy/exhaustion effect for real
   (no offensive tooling in the dev container). Ship a Carapace CrackMe (digest-

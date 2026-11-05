@@ -86,6 +86,25 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 ## Contribution Log (append after every bit — newest at top)
 
 ### 2026-11-05
+- **Shipped Implementation Slice J (honeytokens / canaries, 15/15 green; 137/137
+  across 10 slices).** The "Poison / Hallucinate" axis of the competitive space,
+  built as a real blue-team canary primitive:
+  - Plants plausible, format-valid **fake secrets** (AWS-style keys, bearer
+    tokens, internal URLs, DB creds) that a naive AI-RE agent mines and reports as
+    real findings — poisoning its output and baiting the confident-but-wrong
+    conclusions agents are known to produce.
+  - Made each token **unique per build** and logged to a **private ledger**, so it
+    doubles as an **attribution tripwire**: a `check` tool matches a leaked token
+    back to the exact build that leaked (demonstrated end-to-end — leak detected,
+    build attributed, no false positives, unique across builds).
+  - Proved non-breakage at mechanism level (runtime byte-identical, exports
+    untouched, the decoy section provably non-allocated so the tokens are inert),
+    kept the output deterministic, and wired audit detection + a skill
+    recommendation.
+  - Honest tiering: **Speed-bump** as poison, **Meaningful for detection** as a
+    canary — explicitly *detection/attribution, not prevention* — with the exact
+    bypass named (xref-validation drops unreferenced tokens; rename the tell-tale
+    section for production).
 - **Shipped Implementation Slice I (analysis-surface exhaustion, 14/14 green;
   122/122 across 9 slices).** Absorbed the competitive space's "Exhaust" axis into
   Carapace's native lane — and did it in our mechanism-proven style, not a peer's

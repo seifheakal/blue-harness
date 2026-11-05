@@ -49,9 +49,9 @@ against **your own build** and does three things, audit-first:
 
 ## What's built so far
 
-Eight implementation slices, each **audit → harden → verify**, plus a CI gate
+Nine implementation slices, each **audit → harden → verify**, plus a CI gate
 that runs them all on every push and pull request — every check green
-(`make verify` → 122/122). The **seven countermeasures** below are each rated on
+(`make verify` → 137/137). The **eight countermeasures** below are each rated on
 an honest tier and ship with a **named bypass** — nothing here claims to be
 unbreakable. The audit reads both **Linux ELF** and **Windows PE**
 (`make audit-pe BIN=…`).
@@ -65,6 +65,7 @@ unbreakable. The audit reads both **Linux ELF** and **Windows PE**
 | **Anti-Frida detector** (maps / thread / port) | Cluster G — Frida inject | Meaningful | Stealth modes, renamed gadget, non-default port |
 | **Code-integrity + server-nonce attestation** | Cluster G — patch a hot function | Meaningful→**Strong** (server-tied) | Sustained live hook; client key is extractable (trust rests on the server nonce) |
 | **Analysis-surface exhaustion** (decoy non-alloc sections + synthetic symbols) | the naive "ingest everything" agent — context/token/inventory budget | Trivial→Speed-bump | Filter to `SHF_ALLOC` sections + code-referenced symbols (decoys are never mapped/called) |
+| **Honeytokens / canaries** (plausible decoy secrets + private attribution ledger) | the agent's string-mined "findings" (poison) + crack **attribution** | Speed-bump (poison) / Meaningful (detection) | Xref-validate to drop unreferenced tokens; rename the tell-tale section — detects/attributes, doesn't prevent |
 
 Driven by a scored [audit scanner](harness/audit/) and a [Claude skill](skill/)
 (`carapace audit | recommend | apply | report`) that reads the posture and tells
@@ -145,8 +146,8 @@ check, not evidence a defense fired. Carapace is the opposite trade:
 
 ## Status
 
-**Active — eight verified slices (ELF + PE audit, seven countermeasures, the
-driving skill) plus a CI gate, 122/122 checks green and enforced in CI**
+**Active — nine verified slices (ELF + PE audit, eight countermeasures, the
+driving skill) plus a CI gate, 137/137 checks green and enforced in CI**
 ([`make verify`](.github/workflows/verify.yml) runs on every push and pull
 request — the badge above is that gate). Roadmap in [`docs/STATE.md`](docs/STATE.md).
 

@@ -18,8 +18,9 @@ declare -A WHAT=(
     [g]="PE/Windows exposure audit: DllCharacteristics, imports, PDB, Authenticode (read-only)"
     [h]="CI wiring enforces 'make verify' on every push/PR (config lint; no new countermeasure)"
     [i]="analysis-surface exhaustion: inventory ballooned, runtime byte-identical, exports intact"
+    [j]="honeytokens/canaries: plausible decoy secrets poison + attribute, provably inert"
 )
-ORDER="a b c d e f g h i"
+ORDER="a b c d e f g h i j"
 
 echo "=================================================================="
 echo "  Carapace — measure it, harden it, PROVE it"

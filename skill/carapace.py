@@ -163,6 +163,23 @@ def _rules(s, binpath):
                     "identity transform — exhaust AFTER decoying so the surface stays plausible.",
         })
 
+    # 4c. Honeytokens / canaries — poison the agent's findings + attribution. POST-BUILD.
+    if not s.get("honeytokens_present"):
+        out.append({
+            "id": "honeytokens",
+            "title": "Plant honeytokens / canaries (plausible decoy secrets + private ledger)",
+            "kind": "post-build",
+            "weapon": "the naive agent's string-mining 'findings' (poison) + leak attribution",
+            "tier": "Speed-bump (poison) / Meaningful FOR DETECTION (attribution — not prevention)",
+            "bypass": "A careful analyst xref-validates a 'secret' and drops one nothing references; "
+                      "the default section name is a tell, so rename/randomise it for production.",
+            "command": f"python3 harness/harden/carapace_honeytokens.py plant {b} {b}.honey "
+                       f"--ledger {b}.honey-ledger.json --count 10 --build-tag <build-id>",
+            "note": "Post-build; runtime byte-identical, exports untouched (verified). Keep the ledger "
+                    "PRIVATE — it attributes a leaked token to the exact build. Detects/attributes a "
+                    "crack; it does not stop one.",
+        })
+
     # 5. Link hardening — raises effort, not a decompile blocker.
     if s["hardening"]["relro"] != "full":
         out.append({
