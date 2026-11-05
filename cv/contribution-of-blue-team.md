@@ -86,6 +86,23 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 ## Contribution Log (append after every bit — newest at top)
 
 ### 2026-11-05
+- **Shipped Implementation Slice I (analysis-surface exhaustion, 14/14 green;
+  122/122 across 9 slices).** Absorbed the competitive space's "Exhaust" axis into
+  Carapace's native lane — and did it in our mechanism-proven style, not a peer's
+  size-diff "verify":
+  - Built a post-build pass (`carapace_exhaust.py`, binutils only) with two
+    provably non-breaking levers — **decoy non-allocated sections** (never mapped
+    at runtime) and **synthetic LOCAL FUNC symbols** (`.symtab`-only) — that
+    balloon the inventory and context budget a naive "ingest everything" AI-RE
+    agent must pay, while the program is byte-identical.
+  - Proved non-breakage at mechanism level: runtime output byte-identical, exports
+    (`.dynsym`) untouched, decoy sections verified SHF_ALLOC-clear, zero synthetic
+    symbols leaking into the dynamic table, and deterministic (reproducible) output.
+  - Extended the audit to detect + *measure* it (decoy bytes, synthetic-symbol
+    count, non-alloc byte ratio) and wired an honest recommendation into the skill.
+  - Kept it honest: tier **Trivial→Speed-bump** with the exact bypass named (filter
+    to allocated sections + code-referenced symbols) — cost against the commodity
+    automated path, not prevention.
 - **Ran a competitive-landscape scan of the emerging anti-AI-RE defender space and
   turned it into an absorption plan.** Found three public defenders (notably **BLA**,
   ~2.3k★, MIT) now shipping against AI-RE agents like `rea`/REA — independent

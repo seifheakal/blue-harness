@@ -49,11 +49,12 @@ against **your own build** and does three things, audit-first:
 
 ## What's built so far
 
-Seven implementation slices, each **audit → harden → verify**, plus a CI gate
+Eight implementation slices, each **audit → harden → verify**, plus a CI gate
 that runs them all on every push and pull request — every check green
-(`make verify` → 108/108). Every countermeasure is rated on an honest tier and
-ships with a **named bypass** — nothing here claims to be unbreakable. The audit
-reads both **Linux ELF** and **Windows PE** (`make audit-pe BIN=…`).
+(`make verify` → 122/122). The **seven countermeasures** below are each rated on
+an honest tier and ship with a **named bypass** — nothing here claims to be
+unbreakable. The audit reads both **Linux ELF** and **Windows PE**
+(`make audit-pe BIN=…`).
 
 | Countermeasure | Denies (the `rea` AI-RE agent) | Tier | Named bypass |
 |---|---|---|---|
@@ -63,6 +64,7 @@ reads both **Linux ELF** and **Windows PE** (`make audit-pe BIN=…`).
 | **String encryption** (decode-on-demand loader) | Cluster B/C — `list_strings` on live strings | Speed-bump→Meaningful | Embedded key → recover at rest; lift decoded string from memory |
 | **Anti-Frida detector** (maps / thread / port) | Cluster G — Frida inject | Meaningful | Stealth modes, renamed gadget, non-default port |
 | **Code-integrity + server-nonce attestation** | Cluster G — patch a hot function | Meaningful→**Strong** (server-tied) | Sustained live hook; client key is extractable (trust rests on the server nonce) |
+| **Analysis-surface exhaustion** (decoy non-alloc sections + synthetic symbols) | the naive "ingest everything" agent — context/token/inventory budget | Trivial→Speed-bump | Filter to `SHF_ALLOC` sections + code-referenced symbols (decoys are never mapped/called) |
 
 Driven by a scored [audit scanner](harness/audit/) and a [Claude skill](skill/)
 (`carapace audit | recommend | apply | report`) that reads the posture and tells
@@ -143,8 +145,8 @@ check, not evidence a defense fired. Carapace is the opposite trade:
 
 ## Status
 
-**Active — seven verified slices (ELF + PE audit, six countermeasures, the
-driving skill) plus a CI gate, 108/108 checks green and enforced in CI**
+**Active — eight verified slices (ELF + PE audit, seven countermeasures, the
+driving skill) plus a CI gate, 122/122 checks green and enforced in CI**
 ([`make verify`](.github/workflows/verify.yml) runs on every push and pull
 request — the badge above is that gate). Roadmap in [`docs/STATE.md`](docs/STATE.md).
 

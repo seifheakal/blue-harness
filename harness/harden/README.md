@@ -148,3 +148,37 @@ binary, so an attacker recovers plaintext **at rest** (re-run the keystream) or
 lifts the decoded string from **memory at runtime** (Frida/GDB). This raises cost
 against static/one-shot AI analysis; it is **not a secret store** — a secret that
 truly can't leak belongs server-side (the only Strong tier).
+
+---
+
+## Analysis-surface exhaustion (Slice I) — vs the naive "ingest everything" agent
+
+Absorbs the commodity AI-RE defender "Exhaust" axis into our native lane, and —
+unlike a peer's size-diff "verify" — we **prove** the cost lands on the analyst's
+surface, not on the program. Operates on the compiled ELF via `objcopy` (two
+non-breaking levers), post-build.
+
+```
+python3 carapace_exhaust.py sample_dev sample_dev.exh \
+        --sections 4 --section-size 131072 --symbols 300
+```
+
+| Lever | What it adds | Why it's non-breaking |
+|---|---|---|
+| Decoy **non-alloc** sections (`.carapace_exh_*`) | N×`SHT_PROGBITS` with **SHF_ALLOC clear** | the loader never maps a non-alloc section → zero runtime cost, zero behaviour change |
+| Synthetic **LOCAL FUNC** symbols (`carapace_exh_fn_*`) | M entries in `.symtab` only | LOCAL + symtab-only → `.dynsym`/exports and dynamic linking untouched |
+
+A naive agent that inventories and dumps every section / enumerates every symbol
+pays the full token/context cost of the inflated surface; its inventory can
+truncate. Output is **deterministic** (seeded), so builds are reproducible and the
+verify can assert byte-identical *runtime* behaviour against a clean baseline.
+
+**Tier: Trivial→Speed-bump** (Speed-bump vs a naive ingest-everything agent — the
+commodity-cracking path; Trivial vs anyone who filters). **Named bypass:** restrict
+analysis to allocated/executable (`SHF_ALLOC`) sections and to code-referenced
+symbols — our decoys are never mapped and our synthetic symbols are never called,
+so a one-line filter drops them. **Cost, not prevention.** Pairs with the identity
+transform: exhaust **after** decoying so the surface stays plausible.
+
+Proof it fires + is non-breaking (runtime byte-identical, exports intact, decoys
+non-alloc, no `.dynsym` pollution): `../verify/test_slice_i.sh`.

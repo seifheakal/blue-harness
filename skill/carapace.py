@@ -147,6 +147,22 @@ def _rules(s, binpath):
                     "covers live, used strings.",
         })
 
+    # 4b. Analysis-surface exhaustion — tax the naive agent's budget. POST-BUILD.
+    if not s.get("exhaustion_present"):
+        out.append({
+            "id": "exhaustion",
+            "title": "Inflate analysis surface: decoy non-alloc sections + synthetic symbols",
+            "kind": "post-build",
+            "weapon": "the naive 'ingest everything' AI-RE agent (context/token/inventory budget)",
+            "tier": "Trivial→Speed-bump (taxes the lazy automated path; not a comprehension blocker)",
+            "bypass": "Restrict analysis to allocated/executable (SHF_ALLOC) sections and to "
+                      "code-referenced symbols — our decoys are never mapped and never called.",
+            "command": f"python3 harness/harden/carapace_exhaust.py {b} {b}.exh "
+                       f"--sections 4 --section-size 131072 --symbols 300",
+            "note": "Post-build; runtime byte-identical, exports untouched (verified). Pairs with the "
+                    "identity transform — exhaust AFTER decoying so the surface stays plausible.",
+        })
+
     # 5. Link hardening — raises effort, not a decompile blocker.
     if s["hardening"]["relro"] != "full":
         out.append({

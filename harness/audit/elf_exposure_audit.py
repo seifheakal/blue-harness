@@ -507,6 +507,26 @@ def analyze(path):
     # links it; only the encrypted build carries this marker.
     string_encryption_present = "carapace_strings_enc" in syms
 
+    # Build-time analysis-surface EXHAUSTION (Slice I). Our decoy non-alloc
+    # sections (SHF_ALLOC clear -> never mapped at runtime) and synthetic LOCAL
+    # FUNC symbols balloon the inventory a naive "ingest everything" AI-RE agent
+    # must read, while runtime behaviour is byte-identical. Detection keys on our
+    # markers; the ratio is a measurement, not a claim.
+    SHF_ALLOC = 0x2
+    SHT_PROGBITS = 1
+    exh_sections = [sh for name, sh in elf.sections.items()
+                    if name.startswith(".carapace_exh")]
+    exh_decoy_bytes = sum(sh["size"] for sh in exh_sections)
+    exh_synth_symbols = sum(1 for s in elf.iter_symbols()
+                            if s["name"].startswith("carapace_exh_"))
+    # general static-surface inflation: PROGBITS sections NOT mapped into memory
+    # (flags lack SHF_ALLOC) as a fraction of the whole file. Baseline carries a
+    # little (.comment); our pass drives it up.
+    nonalloc_bytes = sum(sh["size"] for sh in elf.sections.values()
+                         if sh["type"] == SHT_PROGBITS and not (sh["flags"] & SHF_ALLOC))
+    nonalloc_ratio = round(nonalloc_bytes / max(1, len(elf.data)), 4)
+    exhaustion_present = bool(exh_sections) or exh_synth_symbols > 0
+
     signals = {
         "file": os.path.basename(path),
         "arch": ("ELF64" if elf.is64 else "ELF32") + ("-LE" if elf.ei_data == 1 else "-BE"),
@@ -527,6 +547,10 @@ def analyze(path):
         "integrity_guard_present": integrity_guard_present,
         "antifrida_guard_present": antifrida_guard_present,
         "string_encryption_present": string_encryption_present,
+        "exhaustion_present": exhaustion_present,
+        "exhaust_decoy_bytes": exh_decoy_bytes,
+        "exhaust_synth_symbols": exh_synth_symbols,
+        "nonalloc_byte_ratio": nonalloc_ratio,
         "informativeness": informativeness(elf, str_target),
     }
     signals["score"], signals["tier"], signals["recommendation"] = score(signals)
@@ -650,6 +674,9 @@ def render(s):
              "   (vs rea Cluster G Frida inject)")
     L.append(f"    string encryption ...... {yn(s['string_encryption_present'])}"
              "   (vs rea Cluster B/C list_strings)")
+    L.append(f"    analysis exhaustion .... {yn(s['exhaustion_present'])}"
+             f"   (decoy {s['exhaust_decoy_bytes']}B + {s['exhaust_synth_symbols']} synth syms; "
+             f"non-alloc {s['nonalloc_byte_ratio']})")
     L.append("")
     L.append("  Exposure drivers:")
     for r in s["recommendation"]["exposure_drivers"]:

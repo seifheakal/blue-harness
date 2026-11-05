@@ -5,7 +5,7 @@
 > pass work between chats without dumping context. Keep it short and current.
 
 - Last updated: 2026-11-05
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–H ✅) → Testing ✅ (108/108 via `make verify`, enforced in CI) → Slice I (Exhaust) ⬅ next**
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–I ✅) → Testing ✅ (122/122 via `make verify`, enforced in CI) → Slice J (poison/hallucinate depth) ⬅ next**
 - Competitive scan done (2026-11-05): `research/findings/2026-11-05-competitive-landscape.md`
   — peers now defend against AI-RE (BLA ~2.3k★ the serious one). Operator decision:
   **absorb their good ideas into Carapace** ("engulf"), keeping our native-depth +
@@ -181,24 +181,36 @@
     fails when the `make verify` step is removed.
   - `make verify` now **108/108 across 8 slices**.
 
+- **Implementation — Slice I ✅ (analysis-surface Exhaust; 14/14; now 122/122
+  across 9 slices).** Absorbed the peers' "Exhaust" axis into our native lane,
+  mechanism-proven (not a size diff):
+  - **Harden:** `harness/harden/carapace_exhaust.py` — post-build `objcopy` pass,
+    two non-breaking levers: decoy **non-alloc** sections (`.carapace_exh_*`,
+    SHF_ALLOC clear → never mapped at runtime) + synthetic **LOCAL FUNC** symbols
+    (`carapace_exh_fn_*`, `.symtab` only → exports/`.dynsym` untouched).
+    Deterministic (seeded) for reproducible builds.
+  - **Audit:** `exhaustion_present` + measured `exhaust_decoy_bytes` /
+    `exhaust_synth_symbols` / `nonalloc_byte_ratio` (guards section, not the main
+    score).
+  - **Skill:** added the `exhaustion` recommendation (post-build; tier + named
+    bypass; not re-recommended when present).
+  - **Verify:** `harness/verify/test_slice_i.sh` (**14/14**) — audit flips +
+    measures; runtime output **byte-identical**, app still runs, **`.dynsym`
+    byte-identical** (dynamic linking intact); decoy sections proven **non-alloc**;
+    300 synthetic FUNC in `.symtab`, **zero** leaked into `.dynsym`; deterministic.
+  - Tier **Trivial→Speed-bump** (Speed-bump vs the naive ingest-everything agent —
+    the commodity path; Trivial vs anyone who filters). Named bypass: filter to
+    SHF_ALLOC sections + code-referenced symbols. COST, not prevention.
+
 ## Next step (decided)
-**Slice I — Exhaust (analysis-surface exhaustion for native ELF).** Absorbs BLA's
-"Exhaust" axis into our lane, mechanism-proven. Build-time/post-build pass that
-balloons the inventory an AI-RE agent must ingest — **non-allocated decoy sections**
-(SHT_PROGBITS, no SHF_ALLOC → never mapped at runtime) + **synthetic LOCAL FUNC
-symbols** in `.symtab` (via binutils `objcopy --add-section/--add-symbol`; both
-proven non-breaking in a spike: runtime byte-identical, `.dynsym`/exports
-untouched). Audit gains an `exhaustion_present` signal (non-alloc byte ratio +
-symtab-count anomaly; guards section, not the main score). Verify
-(`test_slice_i.sh`): runtime output byte-identical baseline↔exhausted; exports/
-dynsym unchanged (dynamic linking intact); decoy sections are non-alloc (not
-loaded); symtab FUNC count inflated by N; app still runs; audit flips. Honest tier
-**Trivial→Speed-bump** against a *naive "ingest everything" agent* (the P0 target),
-named bypass: filter to SHF_ALLOC / known symbols. Then `make verify` → 117-ish/8+.
+**Slice J — Poison/Hallucinate depth.** Extend the decoy transform (Slice B) with
+honey-metadata + decoy control-flow/notes; fold Quarkslab's "agents fabricate
+plausible-but-wrong output" insight (a correct-*looking* answer ≠ real analysis).
+In scope, no VM. Audit→harden→verify as usual; honest tier + named bypass.
 
 ## Roadmap — absorbed from the competitive scan (ordered)
-- **Slice I — Exhaust** (above) — ⬅ next, in scope, no VM.
-- **Slice J — Poison/Hallucinate depth** — extend the decoy transform (Slice B)
+- **Slice I — Exhaust** — ✅ done (above).
+- **Slice J — Poison/Hallucinate depth** — ⬅ next. Extend the decoy transform (Slice B)
   with honey-metadata + decoy control-flow notes; fold Quarkslab's "agents
   fabricate plausible-but-wrong output" insight. In scope, no VM.
 - **Slice K — Empirical validation + CrackMe** — ⚠ **operator-gated**: needs a
