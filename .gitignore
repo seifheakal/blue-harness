@@ -42,3 +42,10 @@ harness/sample/sample_attest_*
 harness/sample/sample_strings_enc
 harness/sample/sample_strings_plain
 harness/sample/carapace_strings_gen_*.h
+# `carapace harden` / `apply` outputs (binary + its PRIVATE map/ledger — never commit)
+harness/sample/*.hardened
+harness/sample/*.hardened.*
+harness/sample/*.carapace-map.json
+harness/sample/*.honey-ledger.json
+harness/sample/*.exh
+harness/sample/*.honey

@@ -86,6 +86,23 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 ## Contribution Log (append after every bit — newest at top)
 
 ### 2026-11-05
+- **Shipped Implementation Slice L (one-command `harden` + skill install, 17/17
+  green; 154/154 across 11 slices).** Matched the competitive space's one-command
+  ergonomics without sacrificing honesty:
+  - Added `carapace harden <binary>` — a single command that chains every
+    applicable post-build pass (identity decoy → analysis-surface exhaustion →
+    honeytokens), emits the hardened binary plus its private map/ledger, and then
+    **plainly lists the build-time guards it did not apply** (with the rebuild
+    step) and the server-side Strong tier. It refuses to fake a build-time guard
+    onto an already-built binary — the exact honesty line a convenience command is
+    tempted to cross.
+  - Added `carapace install` (+ `make harden` / `make install-skill`) for
+    one-command skill loading; idempotent and guarded against clobbering a real
+    directory.
+  - Verified the whole flow (post-build passes applied, runtime byte-identical,
+    build-time deferred, Strong surfaced, tier+bypass on every item, no overclaim),
+    and refreshed the skill docs (retiring a stale "not yet implemented" note now
+    that string encryption ships).
 - **Shipped Implementation Slice J (honeytokens / canaries, 15/15 green; 137/137
   across 10 slices).** The "Poison / Hallucinate" axis of the competitive space,
   built as a real blue-team canary primitive:

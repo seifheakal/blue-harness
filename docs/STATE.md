@@ -5,7 +5,7 @@
 > pass work between chats without dumping context. Keep it short and current.
 
 - Last updated: 2026-11-05
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–J ✅) → Testing ✅ (137/137 via `make verify`, enforced in CI) → Slice K (empirical + CrackMe, operator-gated) ⬅ next**
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–J + L ✅) → Testing ✅ (154/154 via `make verify`, enforced in CI) → Slice K (empirical + CrackMe, operator-gated) ⬅ next**
 - Competitive scan done (2026-11-05): `research/findings/2026-11-05-competitive-landscape.md`
   — peers now defend against AI-RE (BLA ~2.3k★ the serious one). Operator decision:
   **absorb their good ideas into Carapace** ("engulf"), keeping our native-depth +
@@ -224,6 +224,25 @@
     default section name is a tell (rename for production). Detects/attributes a
     crack — does not prevent it.
 
+- **Implementation — Slice L ✅ (one-command `harden` + skill `install`; UX parity;
+  17/17; now 154/154 across 11 slices).** Closed the ergonomics gap vs the peers'
+  `npx … harden .`, honestly:
+  - **Skill:** `skill/carapace.py harden <bin>` chains every applicable POST-BUILD
+    pass in a safe order (identity decoy → exhaust → honeytokens), writes
+    `<bin>.hardened` + the PRIVATE map/ledger, then prints the build-time guards it
+    did **not** apply (with the rebuild step) and the server-side Strong tier — it
+    never fakes a build-time guard. `carapace install [--user|--dir]` symlinks the
+    skill into `.claude/skills/carapace` (idempotent; refuses to clobber a real dir).
+  - **Front door:** `make harden BIN=…` and `make install-skill`.
+  - **Verify:** `harness/verify/test_slice_l.sh` (**17/17**) — harden applies all 3
+    post-build passes (map + exhaustion + honeytokens present), runtime
+    byte-identical, defers the 5 build-time guards honestly, surfaces the Strong
+    tier, tier+bypass on every applied item, no overclaim; install creates a working
+    link, is idempotent, and refuses to clobber a real dir (rc=2).
+  - `.gitignore`: harden/apply outputs under `harness/sample/` ignored (never ship
+    the private keys). SKILL.md refreshed (removed the stale "roadmap" line — string
+    encryption shipped in Slice F).
+
 ## Next step (decided)
 **Slice K — Empirical validation + CrackMe.** ⚠ **operator-gated** — this is the
 one on the roadmap that needs your action. Stand up a throwaway, **operator-owned
@@ -244,8 +263,8 @@ in-scope, no-VM next move.
   (no offensive tooling in the dev container). Ship a Carapace CrackMe (digest-
   sealed) built from our sample + slices. Produces *measured* numbers or none —
   no vendor-style "internal estimate" multipliers.
-- **Slice L — one-command `carapace harden .` + MCP/skill install parity** (UX
-  parity with `npx bla-agents harden .`). In scope.
+- **Slice L — one-command `carapace harden` + skill `install`** — ✅ done (UX
+  parity with `npx … harden .`, without faking build-time guards).
 - **PE/Mach-O reach** — wire PE into the skill's `audit`/`report` dispatch by
   magic byte (small, was the old Slice I); extend strip/transform to PE + Mach-O
   audit (third format) as those land.

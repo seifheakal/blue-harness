@@ -33,7 +33,10 @@ import subprocess
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AUDIT_DIR = os.path.join(REPO, "harness", "audit")
 AUDIT = os.path.join(AUDIT_DIR, "elf_exposure_audit.py")
-TRANSFORM = os.path.join(REPO, "harness", "harden", "carapace_identity_transform.py")
+HARDEN_DIR = os.path.join(REPO, "harness", "harden")
+TRANSFORM = os.path.join(HARDEN_DIR, "carapace_identity_transform.py")
+EXHAUST = os.path.join(HARDEN_DIR, "carapace_exhaust.py")
+HONEY = os.path.join(HARDEN_DIR, "carapace_honeytokens.py")
 
 sys.path.insert(0, AUDIT_DIR)
 from elf_exposure_audit import analyze, render  # noqa: E402
@@ -295,6 +298,132 @@ def cmd_apply(args):
     return 0
 
 
+def cmd_harden(args):
+    """One command: audit, then apply EVERY applicable POST-BUILD hardening in a
+    safe order, and honestly list the build-time ones that still need a rebuild.
+    The UX-parity entry point (cf. a one-command `harden .`), but it never fakes a
+    build-time guard onto an already-built binary."""
+    import tempfile
+    import shutil as _sh
+    binary = args.binary
+    out = args.out or (binary + ".hardened")
+    s = analyze(binary)
+
+    tmpd = tempfile.mkdtemp(prefix="carapace_harden_")
+    cur = os.path.join(tmpd, "stage0")
+    _sh.copy2(binary, cur)
+    stage = 0
+
+    def _next():
+        nonlocal stage
+        stage += 1
+        return os.path.join(tmpd, f"stage{stage}")
+
+    def _run_pass(cmd):
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0:
+            sys.stderr.write(r.stderr or r.stdout)
+            raise RuntimeError("hardening pass failed")
+        return r.stdout
+
+    applied = []   # (title, tier, bypass, artifact-note)
+    try:
+        # order matters: identity FIRST (it renames/strips OWN symbols), THEN the
+        # additive passes (exhaust / honeytokens) so they aren't touched by it.
+        if s["symbols_present"] or s["debug_info_present"] or s["informativeness"]["symbol_total"] > 0:
+            nf = _next()
+            mp = out + ".carapace-map.json"
+            _run_pass(["python3", TRANSFORM, "transform", "--mode", "D",
+                       "--in", cur, "--out", nf, "--map", mp])
+            cur = nf
+            applied.append(("identity transform (decoy symbols)",
+                            "Speed-bump→Meaningful",
+                            "behavioural xref/value-flow ignores names",
+                            f"PRIVATE map → {_rel(mp)}"))
+
+        if not analyze(cur).get("exhaustion_present"):
+            nf = _next()
+            _run_pass(["python3", EXHAUST, cur, nf,
+                       "--sections", "4", "--section-size", "131072", "--symbols", "300"])
+            cur = nf
+            applied.append(("analysis-surface exhaustion",
+                            "Trivial→Speed-bump",
+                            "filter to SHF_ALLOC sections + code-referenced symbols",
+                            "decoy non-alloc sections + synthetic symbols"))
+
+        if not analyze(cur).get("honeytokens_present"):
+            nf = _next()
+            ledger = out + ".honey-ledger.json"
+            _run_pass(["python3", HONEY, "plant", cur, nf,
+                       "--ledger", ledger, "--count", "10", "--build-tag", args.build_tag])
+            cur = nf
+            applied.append(("honeytokens / canaries",
+                            "Speed-bump (poison) / Meaningful for DETECTION",
+                            "xref-validate drops unreferenced tokens; rename the tell-tale section",
+                            f"PRIVATE ledger → {_rel(ledger)}"))
+
+        _sh.copy2(cur, out)
+    except RuntimeError:
+        _sh.rmtree(tmpd, ignore_errors=True)
+        return 1
+    finally:
+        _sh.rmtree(tmpd, ignore_errors=True)
+
+    # what we did NOT do: the build-time guards (rebuild needed) + the Strong truth.
+    _, recs = recommend(out, want_all=True)
+    deferred = [r for r in recs if r["kind"] == "build-time"]
+    design = [r for r in recs if r["kind"] == "design"]
+
+    print(f"Carapace harden — {_rel(binary)} → {_rel(out)}")
+    print(f"  exposure score {s['score']}/100 → (re-audit {_rel(out)} to see the new posture)")
+    print()
+    print(f"  APPLIED (post-build, {len(applied)}):")
+    for t, tier, byp, art in applied:
+        print(f"    ✓ {t}")
+        print(f"        tier   : {tier}")
+        print(f"        bypass : {byp}")
+        print(f"        artifact: {art}")
+    if not applied:
+        print("    (nothing post-build applied — already hardened, or no symbols)")
+    print()
+    print(f"  NOT APPLIED — build-time, needs a rebuild from source ({len(deferred)}):")
+    for r in deferred:
+        print(f"    • {r['title']}  [{r['tier']}]")
+        print(f"        how: {r['command']}")
+    print()
+    if design:
+        d = design[0]
+        print(f"  THE ONLY STRONG TIER: {d['title']}")
+        print(f"        {d['tier']}")
+    print()
+    print("  Keep every PRIVATE map/ledger OUT of the shipped artifact — they are the keys.")
+    print("  Honest footer: nothing here is unbreakable — anti-RE only raises the attacker's")
+    print("  cost. Post-build passes are COST/DETECTION; the build-time guards and the")
+    print("  server-side relocation above are where real strength lives.")
+    return 0
+
+
+def cmd_install(args):
+    """Install the skill by symlinking skill/ into a .claude/skills/carapace dir —
+    the one-command 'make it available to Claude' step (install parity)."""
+    skill_dir = os.path.join(REPO, "skill")
+    base = args.dir or os.path.join(os.path.expanduser("~") if args.user else os.getcwd(),
+                                     ".claude", "skills")
+    target = os.path.join(base, "carapace")
+    os.makedirs(base, exist_ok=True)
+    if os.path.islink(target):
+        os.unlink(target)
+    elif os.path.exists(target):
+        print(f"carapace error: {target} exists and is not a symlink — remove it first",
+              file=sys.stderr)
+        return 2
+    os.symlink(skill_dir, target)
+    print(f"carapace skill installed: {target} -> {skill_dir}")
+    print("  Claude Code will discover it as the 'carapace' skill. Verify with: "
+          "ls -l " + target)
+    return 0
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(
         prog="carapace",
@@ -322,6 +451,17 @@ def main(argv=None):
     p.add_argument("--map")
     p.add_argument("--string-decoys")
     p.set_defaults(fn=cmd_apply)
+
+    h = sub.add_parser("harden", help="one command: apply every applicable post-build hardening")
+    h.add_argument("binary")
+    h.add_argument("--out", help="output path (default <binary>.hardened)")
+    h.add_argument("--build-tag", default="dev-build", help="build id recorded in the honeytoken ledger")
+    h.set_defaults(fn=cmd_harden)
+
+    i = sub.add_parser("install", help="symlink the skill into .claude/skills/carapace")
+    i.add_argument("--user", action="store_true", help="install into ~/.claude/skills instead of ./")
+    i.add_argument("--dir", help="explicit .claude/skills base dir (overrides --user)")
+    i.set_defaults(fn=cmd_install)
 
     args = ap.parse_args(argv)
     try:

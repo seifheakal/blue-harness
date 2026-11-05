@@ -24,6 +24,8 @@ Point it at your **own** binary:
 
 ```bash
 make report BIN=path/to/your/elf     # full exposure audit + the ordered hardening plan
+make harden BIN=path/to/your/elf     # one command: apply every post-build hardening (honest about the rest)
+make install-skill                   # load the Claude skill (symlink into .claude/skills/carapace)
 ```
 
 No external dependencies: a C toolchain, `make`, and Python 3 (the audit is a
@@ -49,12 +51,12 @@ against **your own build** and does three things, audit-first:
 
 ## What's built so far
 
-Nine implementation slices, each **audit → harden → verify**, plus a CI gate
+Ten implementation slices, each **audit → harden → verify**, plus a CI gate
 that runs them all on every push and pull request — every check green
-(`make verify` → 137/137). The **eight countermeasures** below are each rated on
+(`make verify` → 154/154). The **eight countermeasures** below are each rated on
 an honest tier and ship with a **named bypass** — nothing here claims to be
-unbreakable. The audit reads both **Linux ELF** and **Windows PE**
-(`make audit-pe BIN=…`).
+unbreakable. One command applies every post-build pass (`make harden BIN=…`); the
+audit reads both **Linux ELF** and **Windows PE** (`make audit-pe BIN=…`).
 
 | Countermeasure | Denies (the `rea` AI-RE agent) | Tier | Named bypass |
 |---|---|---|---|
@@ -68,8 +70,9 @@ unbreakable. The audit reads both **Linux ELF** and **Windows PE**
 | **Honeytokens / canaries** (plausible decoy secrets + private attribution ledger) | the agent's string-mined "findings" (poison) + crack **attribution** | Speed-bump (poison) / Meaningful (detection) | Xref-validate to drop unreferenced tokens; rename the tell-tale section — detects/attributes, doesn't prevent |
 
 Driven by a scored [audit scanner](harness/audit/) and a [Claude skill](skill/)
-(`carapace audit | recommend | apply | report`) that reads the posture and tells
-you the next highest-value hardening — with its tier and bypass, every time.
+(`carapace audit | report | recommend | apply | harden | install`) that reads the
+posture and tells you the next highest-value hardening — with its tier and bypass,
+every time — or applies every post-build pass in one `harden` command.
 Details and the attacker-weapon mapping: [`docs/re-techniques/rea.md`](docs/re-techniques/rea.md).
 
 ## What it is / what it isn't
@@ -146,10 +149,11 @@ check, not evidence a defense fired. Carapace is the opposite trade:
 
 ## Status
 
-**Active — nine verified slices (ELF + PE audit, eight countermeasures, the
-driving skill) plus a CI gate, 137/137 checks green and enforced in CI**
-([`make verify`](.github/workflows/verify.yml) runs on every push and pull
-request — the badge above is that gate). Roadmap in [`docs/STATE.md`](docs/STATE.md).
+**Active — ten verified slices (ELF + PE audit, eight countermeasures, the
+driving skill with a one-command `harden`) plus a CI gate, 154/154 checks green
+and enforced in CI** ([`make verify`](.github/workflows/verify.yml) runs on every
+push and pull request — the badge above is that gate). Roadmap in
+[`docs/STATE.md`](docs/STATE.md).
 
 ## License
 

@@ -19,8 +19,9 @@ declare -A WHAT=(
     [h]="CI wiring enforces 'make verify' on every push/PR (config lint; no new countermeasure)"
     [i]="analysis-surface exhaustion: inventory ballooned, runtime byte-identical, exports intact"
     [j]="honeytokens/canaries: plausible decoy secrets poison + attribute, provably inert"
+    [l]="one-command 'carapace harden' applies every post-build pass; honest skill install"
 )
-ORDER="a b c d e f g h i j"
+ORDER="a b c d e f g h i j l"
 
 echo "=================================================================="
 echo "  Carapace — measure it, harden it, PROVE it"

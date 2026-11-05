@@ -8,7 +8,7 @@
 
 BIN ?= harness/sample/sample_dev
 
-.PHONY: demo verify audit report clean help
+.PHONY: demo verify audit audit-pe report harden install-skill clean help
 .DEFAULT_GOAL := help
 
 demo:
@@ -33,6 +33,13 @@ report:
 	@$(MAKE) -s -C harness/sample sample_dev
 	@python3 skill/carapace.py report "$(BIN)"
 
+harden:
+	@$(MAKE) -s -C harness/sample sample_dev
+	@python3 skill/carapace.py harden "$(BIN)"
+
+install-skill:
+	@python3 skill/carapace.py install
+
 clean:
 	@$(MAKE) -s -C harness/sample clean
 	@rm -f harness/verify/ptrace_attach_probe core core.*
@@ -46,6 +53,8 @@ help:
 	@echo "  make audit    BIN=<elf>   scored exposure report for your own binary"
 	@echo "  make audit-pe BIN=<exe>   scored exposure report for a Windows PE"
 	@echo "  make report   BIN=<elf>   full audit + the ordered hardening plan"
+	@echo "  make harden   BIN=<elf>   one command: apply every post-build hardening (honest)"
+	@echo "  make install-skill        symlink the skill into .claude/skills/carapace"
 	@echo "  make clean    remove build artifacts"
 	@echo
 	@echo "Blue team only: audit/harden software you own or are authorized to protect."
