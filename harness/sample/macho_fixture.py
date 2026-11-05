@@ -20,6 +20,7 @@ MH_ALLOW_STACK_EXECUTION = 0x20000
 
 LC_SEGMENT_64 = 0x19
 LC_SYMTAB = 0x2
+LC_DYSYMTAB = 0xB
 LC_LOAD_DYLIB = 0xC
 LC_UUID = 0x1B
 LC_CODE_SIGNATURE = 0x1D
@@ -29,8 +30,14 @@ DYLIB = b"/usr/lib/libSystem.B.dylib\x00"
 STRINGS = [b"https://license.example.test/activate?sku=PRO",
            b"ENTITLEMENT=pro_unlocked",
            b"trial expired - purchase a license to continue"]
-SYMS = [b"_main", b"_validate_license", b"_decrypt_blob", b"_g_secret_key",
-        b"_compute_checksum", b"_phone_home"]
+# LOCAL (static/internal) symbols first, then EXTERNAL defined — the Mach-O
+# convention LC_DYSYMTAB declares as contiguous blocks. `strip -x` removes the
+# locals; the externals dyld needs stay. (Slice O exercises exactly that.)
+SYM_LOCAL = [b"_compute_checksum", b"_g_secret_key", b"_decrypt_blob", b"_phone_home"]
+SYM_EXT = [b"_main", b"_validate_license"]
+SYMS = SYM_LOCAL + SYM_EXT
+N_LOCAL = len(SYM_LOCAL)
+N_EXT = len(SYM_EXT)
 TEXT = (b"\x55\x48\x89\xe5\x90\x90\xc3\x00") * 8   # 64 bytes, low entropy
 
 PROFILES = {
@@ -93,6 +100,8 @@ def build(path, pie, stack_exec, syms, cstring, signed, restrict, encrypted):
     if restrict:
         cmds_sizes.append(72)                           # LC_SEGMENT_64 __RESTRICT (0 sects)
     cmds_sizes.append(24)                               # LC_SYMTAB
+    if syms:
+        cmds_sizes.append(80)                           # LC_DYSYMTAB (local/ext/undef blocks)
     dylib_cmdsize = _align8(24 + len(DYLIB))            # cmd/size + 16 + name(padded)
     cmds_sizes.append(dylib_cmdsize)                    # LC_LOAD_DYLIB
     cmds_sizes.append(24)                               # LC_UUID
@@ -121,6 +130,11 @@ def build(path, pie, stack_exec, syms, cstring, signed, restrict, encrypted):
     if restrict:
         lc += _seg64("__RESTRICT", [])
     lc += struct.pack("<IIIIII", LC_SYMTAB, 24, symoff, nsyms, stroff, len(strtab))
+    if syms:
+        # ilocalsym,nlocalsym, iextdefsym,nextdefsym, iundefsym,nundefsym, then zeros
+        lc += struct.pack("<II", LC_DYSYMTAB, 80)
+        lc += struct.pack("<IIIIII", 0, N_LOCAL, N_LOCAL, N_EXT, N_LOCAL + N_EXT, 0)
+        lc += struct.pack("<IIIIIIIIIIII", *([0] * 12))
     dylib = struct.pack("<IIIIII", LC_LOAD_DYLIB, dylib_cmdsize, 24, 0, 0, 0) + DYLIB
     dylib = dylib.ljust(dylib_cmdsize, b"\x00")
     lc += dylib
@@ -144,7 +158,9 @@ def build(path, pie, stack_exec, syms, cstring, signed, restrict, encrypted):
     body = bytearray(header + lc + text + cstr)
     body = body.ljust(symoff, b"\x00")
     for i, nm in enumerate(SYMS if syms else []):
-        body += struct.pack("<IBBHQ", strx[i], 0x0E, 1, 0, 0x1000 + i * 16)
+        # n_type: N_SECT(0x0e); externals also set N_EXT(0x01) -> 0x0f
+        n_type = 0x0F if i >= N_LOCAL else 0x0E
+        body += struct.pack("<IBBHQ", strx[i], n_type, 1, 0, 0x1000 + i * 16)
     body += strtab
     if encrypted:
         body += b"\x00" * 0x20

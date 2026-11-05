@@ -37,6 +37,7 @@ HARDEN_DIR = os.path.join(REPO, "harness", "harden")
 TRANSFORM = os.path.join(HARDEN_DIR, "carapace_identity_transform.py")
 EXHAUST = os.path.join(HARDEN_DIR, "carapace_exhaust.py")
 HONEY = os.path.join(HARDEN_DIR, "carapace_honeytokens.py")
+MACHO_STRIP = os.path.join(HARDEN_DIR, "carapace_macho_strip.py")
 
 sys.path.insert(0, AUDIT_DIR)
 from elf_exposure_audit import analyze, render  # noqa: E402  (ELF: analyze/render)
@@ -359,6 +360,18 @@ def cmd_report(args):
 
 def cmd_apply(args):
     fmt = _detect_format(args.binary)
+    if fmt == "macho":
+        # the one safe Mach-O post-build pass: strip LOCAL symbols (strip -x).
+        out = args.out or (args.binary + ".stripped")
+        r = subprocess.run(["python3", MACHO_STRIP, "--in", args.binary, "--out", out],
+                           capture_output=True, text=True)
+        sys.stdout.write(r.stdout)
+        if r.returncode != 0:
+            sys.stderr.write(r.stderr)
+            return r.returncode
+        print(f"  applied -> {_rel(out)}   (Mach-O local-symbol strip)")
+        print("  re-audit with `carapace audit`; runtime-identical needs a macOS host to confirm.")
+        return 0
     if fmt != "elf":
         print(f"carapace: apply targets ELF; {_rel(args.binary)} is {fmt.upper()}.")
         print("  The post-build transforms (identity/exhaust/honeytokens) are ELF-only today;")

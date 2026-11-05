@@ -5,7 +5,7 @@
 > pass work between chats without dumping context. Keep it short and current.
 
 - Last updated: 2026-11-05
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–N ✅) → Testing ✅ (208/208 via `make verify`, enforced in CI) → all three native formats audited; open items are operator decisions (below)**
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–O ✅) → Testing ✅ (223/223 via `make verify`, enforced in CI) → all three native formats audited + ELF/Mach-O harden; open items are operator decisions (below)**
 - Competitive scan done (2026-11-05): `research/findings/2026-11-05-competitive-landscape.md`
   — peers now defend against AI-RE (BLA ~2.3k★ the serious one). Operator decision:
   **absorb their good ideas into Carapace** ("engulf"), keeping our native-depth +
@@ -298,6 +298,28 @@
     the score to 0; fat parsed; code-signature read-only note; skill routes Mach-O;
     non-Mach-O rejected cleanly.
 
+- **Implementation — Slice O ✅ (Mach-O local-symbol strip — first Mach-O harden;
+  15/15; now 223/223 across 15 slices).** The Mach-O analog of the ELF identity
+  strip, platform-honest:
+  - **Harden:** `harness/harden/carapace_macho_strip.py` — byte-level `strip -x`
+    (no Apple/LLVM toolchain): removes LOCAL/static symbols via `LC_SYMTAB` +
+    `LC_DYSYMTAB`, preserves external/undefined (dyld needs them), keeps all load
+    commands/segments/sections and **file offsets stable** (in-place, size
+    unchanged). Refuses fat / empty-symtab / no-`LC_DYSYMTAB` with guidance; warns
+    if code-signed (strip → codesign order). Deterministic.
+  - **Fixture:** `macho_fixture.py` now emits `LC_DYSYMTAB` + a local/external
+    split so the strip is meaningful and testable.
+  - **Skill:** `carapace apply <macho>` now dispatches to the strip (ELF `apply`
+    unchanged; `harden` full-chain stays ELF-only). `make harden-macho BIN=…`.
+  - **Verify:** `harness/verify/test_slice_o.sh` (**15/15**) — locals gone +
+    externals preserved; symbol_count 6→2; size stable; segments/sections/dylibs
+    byte-identical; still parses; deterministic; runtime caveat printed; fat /
+    no-symbol inputs refused; skill drives it.
+  - **Honest limit:** we can't execute a Mach-O on Linux, so this is a
+    **structural** proof; **runtime-identical is platform-gated to a macOS host**
+    (stated in the tool + verify, like the Slice K VM). Tier Speed-bump→Meaningful;
+    bypass: exported names remain, behavior recoverable.
+
 ## Status: absorption plan complete
 Every in-scope idea from the competitive scan is now folded in and
 mechanism-proven: **I** (exhaust), **J** (poison/honeytokens), **K** (empirical
@@ -311,11 +333,14 @@ are **operator decisions / operator-gated actions**, not pending build work.
    Wasm/.NET = a **CLAUDE.md §2 change**. Recommendation unchanged: keep the
    mechanism-proven native core; add a web/bundle track only as an explicit,
    separately-tiered second track, never silently. Confirm before any such work.
-3. **PE/Mach-O reach** — ✅ DONE. PE dispatch (Slice M) + Mach-O audit (Slice N).
-   All three native formats (ELF/PE/Mach-O) are audited and auto-detected by the
-   skill. Possible future build increments (in-scope, no VM): a Mach-O **harden**
-   path (strip/transform) to match ELF, and mobile-container reach (APK `.so` /
-   iOS). None pressing; raise with the operator before starting.
+3. **PE/Mach-O reach** — ✅ DONE. PE dispatch (Slice M) + Mach-O audit (Slice N) +
+   Mach-O local-symbol **harden** (Slice O). All three native formats are audited
+   and auto-detected; ELF and Mach-O have a post-build harden path. Possible future
+   increments (in-scope, no VM): more Mach-O harden (decoy/exhaust/honeytokens as
+   added segments — trickier than ELF, needs care without a macOS host to verify),
+   a PE harden path, and mobile-container reach (APK `.so` / iOS). None pressing;
+   raise with the operator before starting. **Mach-O runtime verification is
+   platform-gated to a macOS host** (same class of gating as open item 1's VM).
 
 ## Roadmap — absorbed from the competitive scan (ordered)
 - **Slice I — Exhaust** — ✅ done.

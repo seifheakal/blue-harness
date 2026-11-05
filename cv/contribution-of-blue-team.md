@@ -86,6 +86,18 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 ## Contribution Log (append after every bit — newest at top)
 
 ### 2026-11-05
+- **Shipped Implementation Slice O (Mach-O local-symbol strip — the first Mach-O
+  harden, 15/15 green; 223/223 across 15 slices).** Built a dependency-free
+  `strip -x` equivalent that removes a Mach-O's LOCAL/static symbols via
+  `LC_SYMTAB` + `LC_DYSYMTAB` while preserving the external/undefined symbols the
+  dynamic linker needs — keeping every load command, segment, section and file
+  offset byte-identical (surgical, in-place, deterministic), and refusing unsafe
+  inputs (fat, empty/undeclared symbol tables). Drew the honesty line precisely:
+  because a Mach-O can't be executed on the Linux build host, the verify proves the
+  transform is *surgical* (locals gone, externals kept, nothing else moved) and the
+  tool states plainly that *runtime-identical* confirmation is platform-gated to a
+  macOS host — no overclaiming. Wired it into `carapace apply` and `make
+  harden-macho`.
 - **Shipped Implementation Slice N (Mach-O exposure audit — the third native
   format, 21/21 green; 208/208 across 14 slices).** Wrote a dependency-free Mach-O
   parser (thin 32/64-bit, both byte orders, and fat/universal) that reads what an

@@ -23,8 +23,9 @@ declare -A WHAT=(
     [l]="one-command 'carapace harden' applies every post-build pass; honest skill install"
     [m]="skill routes audit/report by magic byte (ELF/PE); apply/harden refuse non-ELF honestly"
     [n]="Mach-O exposure audit (third format): symtab/cstring/dylibs, soft→hard flip, fat parsed"
+    [o]="Mach-O local-symbol strip (first Mach-O harden): locals gone, externals kept, surgical"
 )
-ORDER="a b c d e f g h i j k l m n"
+ORDER="a b c d e f g h i j k l m n o"
 
 echo "=================================================================="
 echo "  Carapace — measure it, harden it, PROVE it"

@@ -220,3 +220,35 @@ follow-on). A honeytoken is **not** a real secret.
 Keep the ledger **PRIVATE** (out of the shipped artifact) — it is the key that
 makes attribution work. Proof it fires + is non-breaking + attribution/uniqueness:
 `../verify/test_slice_j.sh`.
+
+---
+
+## Mach-O local-symbol strip (Slice O) — the first Mach-O harden
+
+`carapace_macho_strip.py` removes the **LOCAL** (static / internal) symbols from a
+Mach-O's symbol table — exactly what `strip -x` does — so an AI-RE agent loses the
+internal names it mines, while the **external / undefined** symbols the dynamic
+linker needs are preserved. Byte-level, **no Apple/LLVM toolchain**, via
+`LC_SYMTAB` + `LC_DYSYMTAB`.
+
+```
+python3 carapace_macho_strip.py --in app --out app.stripped      # or: carapace apply app
+```
+
+| Property | Result |
+|---|---|
+| local (static) symbols | removed (names gone from the bytes) |
+| external / undefined symbols | preserved (dyld needs them) |
+| segments / sections / file offsets | byte-identical (in-place, size stable) |
+| fat/universal, empty symtab, no `LC_DYSYMTAB` | refused with guidance |
+
+**Honest limit (CLAUDE.md §3):** we run on Linux and **cannot execute a Mach-O**,
+so — unlike the ELF transforms — we do **not** claim runtime-identical here. The
+verify proves the transform is **surgical** (only the local nlist entries + their
+strings go; everything else is preserved); **runtime-identical is platform-gated
+to a macOS host**. Stripping also invalidates an existing code signature, so the
+correct order is strip → codesign on the build host (the tool warns if signed).
+
+**Tier:** *Speed-bump→Meaningful*. **Named bypass:** the exported names remain and
+a thorough agent recovers logic from behavior/xrefs regardless of names. Proof
+(structural): `../verify/test_slice_o.sh`.

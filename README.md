@@ -51,9 +51,9 @@ against **your own build** and does three things, audit-first:
 
 ## What's built so far
 
-Thirteen implementation slices, each **audit → harden → verify**, plus a CI gate
+Fourteen implementation slices, each **audit → harden → verify**, plus a CI gate
 that runs them all on every push and pull request — every check green
-(`make verify` → 208/208). The **eight countermeasures** below are each rated on
+(`make verify` → 223/223). The **nine countermeasures** below are each rated on
 an honest tier and ship with a **named bypass** — nothing here claims to be
 unbreakable. One command applies every post-build pass (`make harden BIN=…`); the
 audit **auto-detects the format by magic byte** and reads **Linux ELF**, **Windows
@@ -69,6 +69,7 @@ PE** and **macOS/iOS Mach-O** (`carapace audit <bin>` routes any of the three).
 | **Code-integrity + server-nonce attestation** | Cluster G — patch a hot function | Meaningful→**Strong** (server-tied) | Sustained live hook; client key is extractable (trust rests on the server nonce) |
 | **Analysis-surface exhaustion** (decoy non-alloc sections + synthetic symbols) | the naive "ingest everything" agent — context/token/inventory budget | Trivial→Speed-bump | Filter to `SHF_ALLOC` sections + code-referenced symbols (decoys are never mapped/called) |
 | **Honeytokens / canaries** (plausible decoy secrets + private attribution ledger) | the agent's string-mined "findings" (poison) + crack **attribution** | Speed-bump (poison) / Meaningful (detection) | Xref-validate to drop unreferenced tokens; rename the tell-tale section — detects/attributes, doesn't prevent |
+| **Mach-O local-symbol strip** (`strip -x` equivalent, no toolchain) | internal/static names an agent mines from a macOS/iOS Mach-O | Speed-bump→Meaningful | Exported names remain (dyld needs them); behavior is recoverable. Runtime-identical is proven on a macOS host, not here |
 
 Driven by a scored [audit scanner](harness/audit/) and a [Claude skill](skill/)
 (`carapace audit | report | recommend | apply | harden | install`) that reads the
@@ -158,12 +159,12 @@ check, not evidence a defense fired. Carapace is the opposite trade:
 
 ## Status
 
-**Active — thirteen verified slices (ELF + PE + Mach-O audit with magic-byte
-dispatch, eight countermeasures, the driving skill with a one-command `harden`, a
-digest-sealed CrackMe + honest empirical scorer) plus a CI gate, 208/208 checks
-green and enforced in CI** ([`make verify`](.github/workflows/verify.yml) runs on
-every push and pull request — the badge above is that gate). Roadmap in
-[`docs/STATE.md`](docs/STATE.md).
+**Active — fourteen verified slices (ELF + PE + Mach-O audit with magic-byte
+dispatch, nine countermeasures incl. a Mach-O local-symbol strip, the driving
+skill with a one-command `harden`, a digest-sealed CrackMe + honest empirical
+scorer) plus a CI gate, 223/223 checks green and enforced in CI**
+([`make verify`](.github/workflows/verify.yml) runs on every push and pull
+request — the badge above is that gate). Roadmap in [`docs/STATE.md`](docs/STATE.md).
 
 ## License
 

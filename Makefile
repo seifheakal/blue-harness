@@ -8,7 +8,7 @@
 
 BIN ?= harness/sample/sample_dev
 
-.PHONY: demo verify audit audit-pe audit-macho report harden install-skill clean help
+.PHONY: demo verify audit audit-pe audit-macho report harden harden-macho install-skill clean help
 .DEFAULT_GOAL := help
 
 demo:
@@ -40,6 +40,9 @@ harden:
 	@$(MAKE) -s -C harness/sample sample_dev
 	@python3 skill/carapace.py harden "$(BIN)"
 
+harden-macho:
+	@python3 harness/harden/carapace_macho_strip.py --in "$(BIN)" --out "$(BIN).stripped"
+
 install-skill:
 	@python3 skill/carapace.py install
 
@@ -58,6 +61,7 @@ help:
 	@echo "  make audit-macho BIN=<o> scored exposure report for a Mach-O (macOS/iOS)"
 	@echo "  make report   BIN=<elf>   full audit + the ordered hardening plan"
 	@echo "  make harden   BIN=<elf>   one command: apply every post-build hardening (honest)"
+	@echo "  make harden-macho BIN=<o> strip LOCAL symbols from a Mach-O (strip -x equivalent)"
 	@echo "  make install-skill        symlink the skill into .claude/skills/carapace"
 	@echo "  make clean    remove build artifacts"
 	@echo

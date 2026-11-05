@@ -307,8 +307,9 @@ def score(s):
 def recommend(s):
     h = s["hardening"]
     if s["symbols_present"]:
-        return ("Strip the symbol table (`strip`) and don't ship a companion dSYM — "
-                "Tier: Meaningful. Bypass: the agent reasons from behavior without names.")
+        return ("Strip LOCAL/static symbols (harness/harden/carapace_macho_strip.py, or "
+                "`carapace apply`) and don't ship a companion dSYM — Tier: Speed-bump→Meaningful. "
+                "Bypass: exported names remain (dyld needs them); the agent reasons from behavior.")
     if s["string_density"] >= 0.05:
         return ("Encrypt / decode-on-demand high-density plaintext strings "
                 "(see harness/harden/carapace_string_encrypt.py). Tier: Speed-bump→Meaningful. "
