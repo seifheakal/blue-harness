@@ -8,7 +8,7 @@
 
 BIN ?= harness/sample/sample_dev
 
-.PHONY: demo verify audit audit-pe report harden install-skill clean help
+.PHONY: demo verify audit audit-pe audit-macho report harden install-skill clean help
 .DEFAULT_GOAL := help
 
 demo:
@@ -28,6 +28,9 @@ audit:
 
 audit-pe:
 	@python3 harness/audit/pe_exposure_audit.py "$(BIN)"
+
+audit-macho:
+	@python3 harness/audit/macho_exposure_audit.py "$(BIN)"
 
 report:
 	@$(MAKE) -s -C harness/sample sample_dev
@@ -52,6 +55,7 @@ help:
 	@echo "  make verify   run every verify slice and print one posture summary"
 	@echo "  make audit    BIN=<elf>   scored exposure report for your own binary"
 	@echo "  make audit-pe BIN=<exe>   scored exposure report for a Windows PE"
+	@echo "  make audit-macho BIN=<o> scored exposure report for a Mach-O (macOS/iOS)"
 	@echo "  make report   BIN=<elf>   full audit + the ordered hardening plan"
 	@echo "  make harden   BIN=<elf>   one command: apply every post-build hardening (honest)"
 	@echo "  make install-skill        symlink the skill into .claude/skills/carapace"

@@ -51,13 +51,13 @@ against **your own build** and does three things, audit-first:
 
 ## What's built so far
 
-Twelve implementation slices, each **audit → harden → verify**, plus a CI gate
+Thirteen implementation slices, each **audit → harden → verify**, plus a CI gate
 that runs them all on every push and pull request — every check green
-(`make verify` → 187/187). The **eight countermeasures** below are each rated on
+(`make verify` → 208/208). The **eight countermeasures** below are each rated on
 an honest tier and ship with a **named bypass** — nothing here claims to be
 unbreakable. One command applies every post-build pass (`make harden BIN=…`); the
-audit **auto-detects the format by magic byte** and reads both **Linux ELF** and
-**Windows PE** (`carapace audit <bin>` routes either way).
+audit **auto-detects the format by magic byte** and reads **Linux ELF**, **Windows
+PE** and **macOS/iOS Mach-O** (`carapace audit <bin>` routes any of the three).
 
 | Countermeasure | Denies (the `rea` AI-RE agent) | Tier | Named bypass |
 |---|---|---|---|
@@ -107,9 +107,10 @@ Details and the attacker-weapon mapping: [`docs/re-techniques/rea.md`](docs/re-t
 **Priority 0 across both tracks:** the AI-assisted tooling that drives those
 engines from a single prompt — disassembler MCP servers, autonomous RE agents,
 LLM decompilers, AI Frida-hook generators. That's the headline threat; the
-classic tools are the substrate it rides on. The implemented slices currently
-target **native ELF on Linux**, with a read-only **Windows PE** exposure audit
-(Slice G); the catalog and design cover the rest. See
+classic tools are the substrate it rides on. The implemented countermeasures
+currently target **native ELF on Linux**; the read-only exposure audit covers all
+three native formats — **ELF, Windows PE (Slice G) and macOS/iOS Mach-O (Slice
+N)** — auto-detected by magic byte. The catalog and design cover the rest. See
 [`docs/re-techniques/_index.md`](docs/re-techniques/_index.md). Electron / web /
 JS / WebAssembly / pure-.NET are out of current scope.
 
@@ -157,11 +158,11 @@ check, not evidence a defense fired. Carapace is the opposite trade:
 
 ## Status
 
-**Active — twelve verified slices (ELF + PE audit with magic-byte dispatch, eight
-countermeasures, the driving skill with a one-command `harden`, a digest-sealed
-CrackMe + honest empirical scorer) plus a CI gate, 187/187 checks green and
-enforced in CI** ([`make verify`](.github/workflows/verify.yml) runs on every push
-and pull request — the badge above is that gate). Roadmap in
+**Active — thirteen verified slices (ELF + PE + Mach-O audit with magic-byte
+dispatch, eight countermeasures, the driving skill with a one-command `harden`, a
+digest-sealed CrackMe + honest empirical scorer) plus a CI gate, 208/208 checks
+green and enforced in CI** ([`make verify`](.github/workflows/verify.yml) runs on
+every push and pull request — the badge above is that gate). Roadmap in
 [`docs/STATE.md`](docs/STATE.md).
 
 ## License

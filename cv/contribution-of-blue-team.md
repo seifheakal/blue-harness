@@ -86,6 +86,18 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 ## Contribution Log (append after every bit — newest at top)
 
 ### 2026-11-05
+- **Shipped Implementation Slice N (Mach-O exposure audit — the third native
+  format, 21/21 green; 208/208 across 14 slices).** Wrote a dependency-free Mach-O
+  parser (thin 32/64-bit, both byte orders, and fat/universal) that reads what an
+  AI-RE agent reads — symbol-table size, `__TEXT,__cstring` string density, section
+  entropy, linked dylibs, PIE / stack-exec / `__RESTRICT` flags, a code signature
+  (kept honest: presence only, **not** verified), and `__TEXT` encryption — and
+  scores a posture tier parallel to the ELF and PE scanners. Made it testable with
+  **zero Apple toolchain** via a byte-level fixture generator (soft/hard/encrypted
+  + a fat wrapper) driving a 21-check verify (soft→hard flip, encryption cratering
+  the static-view score, fat parsing, skill dispatch). With Slice M's magic-byte
+  routing, Carapace now audits **all three native formats (ELF/PE/Mach-O)** from one
+  `carapace audit <bin>`.
 - **Shipped Implementation Slice M (format dispatch, 13/13 green; 187/187 across
   13 slices).** Unified the audit front door across formats: the skill now detects
   ELF / PE / Mach-O by magic byte and routes `audit`/`report`/`recommend` to the

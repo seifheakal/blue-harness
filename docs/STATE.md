@@ -5,7 +5,7 @@
 > pass work between chats without dumping context. Keep it short and current.
 
 - Last updated: 2026-11-05
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–M ✅) → Testing ✅ (187/187 via `make verify`, enforced in CI) → format reach: PE dispatch done (M); Mach-O audit (N) ⬅ next**
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–N ✅) → Testing ✅ (208/208 via `make verify`, enforced in CI) → all three native formats audited; open items are operator decisions (below)**
 - Competitive scan done (2026-11-05): `research/findings/2026-11-05-competitive-landscape.md`
   — peers now defend against AI-RE (BLA ~2.3k★ the serious one). Operator decision:
   **absorb their good ideas into Carapace** ("engulf"), keeping our native-depth +
@@ -280,6 +280,24 @@
     unregressed; unsupported blob handled cleanly. Mach-O magic is already detected
     (wired lazily) — the scanner itself lands in Slice N.
 
+- **Implementation — Slice N ✅ (Mach-O exposure audit — the third format; 21/21;
+  now 208/208 across 14 slices).** Completes the native-format audit trio:
+  - **Audit:** `harness/audit/macho_exposure_audit.py` — self-contained Mach-O
+    parser (thin 32/64-bit, both byte orders, + fat/universal). Reads symbol-table
+    size, `__TEXT,__cstring` density, section entropy, linked dylibs, PIE /
+    stack-exec / `__RESTRICT` flags, a code signature (**read-only — presence only,
+    not verified**), and `__TEXT` encryption (`LC_ENCRYPTION_INFO` cryptid). Scored
+    + tiered parallel to the ELF/PE scanners. `make audit-macho BIN=…`.
+  - **Fixture:** `harness/sample/macho_fixture.py` — toolchain-free generator
+    (soft/hard/encrypted + a fat wrapper) so verify needs no Apple toolchain.
+  - **Skill:** the Slice-M magic-byte dispatch now has a live Mach-O target
+    (`audit`/`report`/`recommend` route it; `apply`/`harden` refuse it honestly).
+  - **Verify:** `harness/verify/test_slice_n.sh` (**21/21**) — header/arch/filetype,
+    symtab + `__cstring` + dylibs parsed; soft→hard flip (stripped + PIE +
+    `__RESTRICT` + signed; score 64→18, tier changes); `__TEXT` encryption craters
+    the score to 0; fat parsed; code-signature read-only note; skill routes Mach-O;
+    non-Mach-O rejected cleanly.
+
 ## Status: absorption plan complete
 Every in-scope idea from the competitive scan is now folded in and
 mechanism-proven: **I** (exhaust), **J** (poison/honeytokens), **K** (empirical
@@ -293,9 +311,11 @@ are **operator decisions / operator-gated actions**, not pending build work.
    Wasm/.NET = a **CLAUDE.md §2 change**. Recommendation unchanged: keep the
    mechanism-proven native core; add a web/bundle track only as an explicit,
    separately-tiered second track, never silently. Confirm before any such work.
-3. **PE/Mach-O reach** (in-scope, no VM): PE dispatch ✅ (Slice M). **Next: Slice N
-   — a Mach-O audit scanner** (third format) + a toolchain-free fixture, then flip
-   the skill's already-wired Mach-O branch to use it. The in-flight build item.
+3. **PE/Mach-O reach** — ✅ DONE. PE dispatch (Slice M) + Mach-O audit (Slice N).
+   All three native formats (ELF/PE/Mach-O) are audited and auto-detected by the
+   skill. Possible future build increments (in-scope, no VM): a Mach-O **harden**
+   path (strip/transform) to match ELF, and mobile-container reach (APK `.so` /
+   iOS). None pressing; raise with the operator before starting.
 
 ## Roadmap — absorbed from the competitive scan (ordered)
 - **Slice I — Exhaust** — ✅ done.
@@ -305,9 +325,9 @@ are **operator decisions / operator-gated actions**, not pending build work.
   effectiveness *run* is operator-gated (sandboxed `rea` VM) — see open item 1.
 - **Slice L — one-command `carapace harden` + skill `install`** — ✅ done (UX
   parity with `npx … harden .`, without faking build-time guards).
-- **PE/Mach-O reach** — wire PE into the skill's `audit`/`report` dispatch by
-  magic byte (small, was the old Slice I); extend strip/transform to PE + Mach-O
-  audit (third format) as those land.
+- **PE/Mach-O reach** — ✅ done: PE dispatch (Slice M) + Mach-O audit (Slice N);
+  the skill auto-detects ELF/PE/Mach-O. A Mach-O/PE *harden* path (beyond audit)
+  remains a possible future increment.
 - **REJECTED as a defense:** instruction-file barriers / terminal shims (antirea
   style) — relies on a cooperative model; violates CLAUDE.md §2. Never scored.
 

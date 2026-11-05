@@ -22,8 +22,9 @@ declare -A WHAT=(
     [k]="empirical CrackMe + honest scorer plumbing (effectiveness run is operator-VM-gated)"
     [l]="one-command 'carapace harden' applies every post-build pass; honest skill install"
     [m]="skill routes audit/report by magic byte (ELF/PE); apply/harden refuse non-ELF honestly"
+    [n]="Mach-O exposure audit (third format): symtab/cstring/dylibs, soft→hard flip, fat parsed"
 )
-ORDER="a b c d e f g h i j k l m"
+ORDER="a b c d e f g h i j k l m n"
 
 echo "=================================================================="
 echo "  Carapace — measure it, harden it, PROVE it"
