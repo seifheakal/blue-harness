@@ -122,6 +122,25 @@ each step.
 - [`docs/`](docs/) — threat model, the RE catalog, and the worked countermeasure analysis
 - [`CLAUDE.md`](CLAUDE.md) — project constitution, scope & workflow
 
+## How we compare
+
+Carapace isn't alone in defending against AI-assisted RE — and that's a good
+sign the threat is real. The difference is **depth and proof**. Peer tools cover
+many bundle formats (Electron / JS / Wasm / .NET) but on **native binaries** tend
+to be *designed-for* rather than *verified*, and their "verify" is often a drift
+check, not evidence a defense fired. Carapace is the opposite trade:
+
+- **Mechanism-proven, not asserted** — every countermeasure ships a test that
+  proves it *fires* (real `PTRACE_ATTACH` refusal, suppressed core, a server that
+  *rejects* a patched function, plaintext strings gone from the bytes), not a
+  before/after size diff.
+- **A named bypass + honest tier on every single defense** — no "internal
+  estimate" multipliers, no implied uncrackability.
+- **Native/mobile depth first** — ELF today (PE audit too), with the broader
+  ecosystem's best ideas (e.g. analysis-surface *exhaustion*) folded into our own
+  slices rather than bolted on. See
+  [`research/findings/2026-11-05-competitive-landscape.md`](research/findings/2026-11-05-competitive-landscape.md).
+
 ## Status
 
 **Active — seven verified slices (ELF + PE audit, six countermeasures, the

@@ -4,8 +4,12 @@
 > at the start and **updates it at the end** before handing off. This is how we
 > pass work between chats without dumping context. Keep it short and current.
 
-- Last updated: 2026-11-04
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–H ✅) → Testing ✅ (108/108 via `make verify`, now enforced in CI) → Slice I ⬅ next**
+- Last updated: 2026-11-05
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–H ✅) → Testing ✅ (108/108 via `make verify`, enforced in CI) → Slice I (Exhaust) ⬅ next**
+- Competitive scan done (2026-11-05): `research/findings/2026-11-05-competitive-landscape.md`
+  — peers now defend against AI-RE (BLA ~2.3k★ the serious one). Operator decision:
+  **absorb their good ideas into Carapace** ("engulf"), keeping our native-depth +
+  mechanism-proof edge. Absorb ideas, not their MIT code (clean-room).
 - Worked specimen: **`rea`** (morluto/rea, npm `rea-agents`) — the P0 reference.
 
 ## Done so far
@@ -178,17 +182,44 @@
   - `make verify` now **108/108 across 8 slices**.
 
 ## Next step (decided)
-**Slice I — wire PE detection into the skill's `audit`/`report` dispatch by magic
-byte.** Slice G's PE scanner exists but is only reachable via `make audit-pe`;
-the skill (`skill/carapace.py`) and `make report` still assume ELF. Detect the
-format by magic (`\x7fELF` vs `MZ`/PE) and route to the right scanner so the
-driving skill and the front-door `report` cover both formats. Small, audit-first,
-no new countermeasure, no operator VM needed.
+**Slice I — Exhaust (analysis-surface exhaustion for native ELF).** Absorbs BLA's
+"Exhaust" axis into our lane, mechanism-proven. Build-time/post-build pass that
+balloons the inventory an AI-RE agent must ingest — **non-allocated decoy sections**
+(SHT_PROGBITS, no SHF_ALLOC → never mapped at runtime) + **synthetic LOCAL FUNC
+symbols** in `.symtab` (via binutils `objcopy --add-section/--add-symbol`; both
+proven non-breaking in a spike: runtime byte-identical, `.dynsym`/exports
+untouched). Audit gains an `exhaustion_present` signal (non-alloc byte ratio +
+symtab-count anomaly; guards section, not the main score). Verify
+(`test_slice_i.sh`): runtime output byte-identical baseline↔exhausted; exports/
+dynsym unchanged (dynamic linking intact); decoy sections are non-alloc (not
+loaded); symtab FUNC count inflated by N; app still runs; audit flips. Honest tier
+**Trivial→Speed-bump** against a *naive "ingest everything" agent* (the P0 target),
+named bypass: filter to SHF_ALLOC / known symbols. Then `make verify` → 117-ish/8+.
 
-**Follow-ons / parked:** a Mach-O audit pass (the third format, a larger
-audit-first slice); and the empirical AI-layer validation (decoy effectiveness,
-coverage-poisoning) that still needs the sandboxed, operator-owned `rea` VM — do
-not install offensive tooling in the dev container.
+## Roadmap — absorbed from the competitive scan (ordered)
+- **Slice I — Exhaust** (above) — ⬅ next, in scope, no VM.
+- **Slice J — Poison/Hallucinate depth** — extend the decoy transform (Slice B)
+  with honey-metadata + decoy control-flow notes; fold Quarkslab's "agents
+  fabricate plausible-but-wrong output" insight. In scope, no VM.
+- **Slice K — Empirical validation + CrackMe** — ⚠ **operator-gated**: needs a
+  throwaway, operator-owned `rea` VM to measure decoy/exhaustion effect for real
+  (no offensive tooling in the dev container). Ship a Carapace CrackMe (digest-
+  sealed) built from our sample + slices. Produces *measured* numbers or none —
+  no vendor-style "internal estimate" multipliers.
+- **Slice L — one-command `carapace harden .` + MCP/skill install parity** (UX
+  parity with `npx bla-agents harden .`). In scope.
+- **PE/Mach-O reach** — wire PE into the skill's `audit`/`report` dispatch by
+  magic byte (small, was the old Slice I); extend strip/transform to PE + Mach-O
+  audit (third format) as those land.
+- **REJECTED as a defense:** instruction-file barriers / terminal shims (antirea
+  style) — relies on a cooperative model; violates CLAUDE.md §2. Never scored.
+
+## Needs operator decision
+- **Scope expansion:** "have all things" vs Electron/JS/Wasm/.NET bundles is a
+  **CLAUDE.md §2 change**. Recommendation: keep native/mobile as the mechanism-
+  proven core (our edge); add a web/bundle track only as an explicit, separately-
+  tiered second track, never silently and never at the cost of "prove it".
+  Confirm before any web/bundle work starts.
 
 **Then / parked:** empirical AI-layer validation (decoy effectiveness,
 coverage-poisoning) still needs the sandboxed, operator-owned `rea` VM — do not

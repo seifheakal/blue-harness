@@ -85,6 +85,22 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 
 ## Contribution Log (append after every bit — newest at top)
 
+### 2026-11-05
+- **Ran a competitive-landscape scan of the emerging anti-AI-RE defender space and
+  turned it into an absorption plan.** Found three public defenders (notably **BLA**,
+  ~2.3k★, MIT) now shipping against AI-RE agents like `rea`/REA — independent
+  validation of the project's thesis. Wrote a cited finding
+  (`research/findings/2026-11-05-competitive-landscape.md`) with a
+  technique-by-technique **absorption matrix**: identified Carapace's durable edge
+  (native-depth, *mechanism-proven firing* vs. the peers' self-admitted drift-check
+  "verify," and a named bypass + honest tier on every defense), folded their best
+  ideas (analysis-surface **exhaustion**, decoy/poison depth, an empirical REA
+  benchmark + CrackMe, one-command UX) into the Carapace roadmap, and **rejected on
+  principle** the instruction-file/terminal-shim "barriers" that rely on a
+  cooperative model (the exact non-defense the project forbids). Flagged the one
+  real fork — expanding past native/mobile into web/bundle formats — as an explicit
+  operator scope decision rather than silent scope creep.
+
 ### 2026-11-04
 - **Shipped Implementation Slice H (CI that enforces `make verify`, 9/9 green;
   108/108 across all slices).** Turned the "prove it" claim from a local run into
