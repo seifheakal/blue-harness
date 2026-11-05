@@ -51,9 +51,9 @@ against **your own build** and does three things, audit-first:
 
 ## What's built so far
 
-Ten implementation slices, each **audit → harden → verify**, plus a CI gate
+Eleven implementation slices, each **audit → harden → verify**, plus a CI gate
 that runs them all on every push and pull request — every check green
-(`make verify` → 154/154). The **eight countermeasures** below are each rated on
+(`make verify` → 174/174). The **eight countermeasures** below are each rated on
 an honest tier and ship with a **named bypass** — nothing here claims to be
 unbreakable. One command applies every post-build pass (`make harden BIN=…`); the
 audit reads both **Linux ELF** and **Windows PE** (`make audit-pe BIN=…`).
@@ -73,6 +73,13 @@ Driven by a scored [audit scanner](harness/audit/) and a [Claude skill](skill/)
 (`carapace audit | report | recommend | apply | harden | install`) that reads the
 posture and tells you the next highest-value hardening — with its tier and bypass,
 every time — or applies every post-build pass in one `harden` command.
+
+To put honest *numbers* on it, Carapace also ships a digest-sealed
+[CrackMe](harness/crackme/) and an [empirical scorer](harness/measure/): run a real
+AI-RE agent against the baseline vs. the hardened build on your own sandboxed VM,
+and get a measured before/after (a "crack" counts only if it hashes to the sealed
+flag; missing figures read *not measured*, never estimated). See the
+[runbook](docs/workflow/slice-k-empirical-runbook.md).
 Details and the attacker-weapon mapping: [`docs/re-techniques/rea.md`](docs/re-techniques/rea.md).
 
 ## What it is / what it isn't
@@ -149,11 +156,11 @@ check, not evidence a defense fired. Carapace is the opposite trade:
 
 ## Status
 
-**Active — ten verified slices (ELF + PE audit, eight countermeasures, the
-driving skill with a one-command `harden`) plus a CI gate, 154/154 checks green
-and enforced in CI** ([`make verify`](.github/workflows/verify.yml) runs on every
-push and pull request — the badge above is that gate). Roadmap in
-[`docs/STATE.md`](docs/STATE.md).
+**Active — eleven verified slices (ELF + PE audit, eight countermeasures, the
+driving skill with a one-command `harden`, a digest-sealed CrackMe + honest
+empirical scorer) plus a CI gate, 174/174 checks green and enforced in CI**
+([`make verify`](.github/workflows/verify.yml) runs on every push and pull
+request — the badge above is that gate). Roadmap in [`docs/STATE.md`](docs/STATE.md).
 
 ## License
 

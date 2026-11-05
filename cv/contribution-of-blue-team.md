@@ -86,6 +86,23 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 ## Contribution Log (append after every bit — newest at top)
 
 ### 2026-11-05
+- **Shipped Implementation Slice K (empirical harness + CrackMe + honest scorer,
+  plumbing 20/20 green; 174/174 across 12 slices).** Built the apparatus to put
+  *measured* numbers on the hardening — the empirical claim the competitive space
+  makes with "internal estimate" multipliers — but honest by construction:
+  - A digest-sealed **CrackMe** (one source, baseline vs Carapace-hardened) whose
+    flag plaintext is never committed; only its SHA-256 is published, so a claimed
+    crack is verifiable without shipping the answer.
+  - An **honest scorer** that turns an operator's recorded agent runs into a
+    before/after: a "crack" counts only if it hashes to the seal (the agent's
+    self-report isn't trusted), token/wall figures are agent-reported with absent
+    values shown as *not measured* (never estimated), and a honeytoken the agent
+    reported as a secret is scored as poison + attribution.
+  - A **runbook** for running a real AI-RE agent against the pair on a sandboxed,
+    operator-owned VM — with the ethics/scope guardrail that offensive tooling is
+    never installed in the dev/CI container.
+  - Scoped the honesty precisely: the verify proves the *plumbing* (20/20); the
+    effectiveness claim is explicitly gated on the operator VM run, not asserted.
 - **Shipped Implementation Slice L (one-command `harden` + skill install, 17/17
   green; 154/154 across 11 slices).** Matched the competitive space's one-command
   ergonomics without sacrificing honesty:

@@ -49,3 +49,7 @@ harness/sample/*.carapace-map.json
 harness/sample/*.honey-ledger.json
 harness/sample/*.exh
 harness/sample/*.honey
+
+# Slice K CrackMe — build outputs (binaries, SEAL, PRIVATE ledger) + the real flag
+harness/crackme/build/
+harness/crackme/secret.local.txt

@@ -5,7 +5,7 @@
 > pass work between chats without dumping context. Keep it short and current.
 
 - Last updated: 2026-11-05
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–J + L ✅) → Testing ✅ (154/154 via `make verify`, enforced in CI) → Slice K (empirical + CrackMe, operator-gated) ⬅ next**
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–L ✅) → Testing ✅ (174/174 via `make verify`, enforced in CI) → absorption plan COMPLETE; open items are operator decisions (see below)**
 - Competitive scan done (2026-11-05): `research/findings/2026-11-05-competitive-landscape.md`
   — peers now defend against AI-RE (BLA ~2.3k★ the serious one). Operator decision:
   **absorb their good ideas into Carapace** ("engulf"), keeping our native-depth +
@@ -243,26 +243,50 @@
     the private keys). SKILL.md refreshed (removed the stale "roadmap" line — string
     encryption shipped in Slice F).
 
-## Next step (decided)
-**Slice K — Empirical validation + CrackMe.** ⚠ **operator-gated** — this is the
-one on the roadmap that needs your action. Stand up a throwaway, **operator-owned
-`rea` VM** (sandboxed) and measure, for real, how much the decoy/exhaust/honeytoken
-slices degrade an actual agent run (decoy-contradiction surfacing, context/token
-cost, honeytoken surfacing) — producing *measured* numbers or none (no vendor-style
-"internal estimate" multipliers). Ship a **Carapace CrackMe** built from our sample
-+ slices, publishing only digests. Do **not** install offensive tooling in this dev
-container — this slice is blocked until the operator provides the VM. Until then,
-Slice L (one-command `carapace harden .` + MCP/skill install parity) is the best
-in-scope, no-VM next move.
+- **Implementation — Slice K ✅ (empirical harness + CrackMe + scorer; plumbing
+  20/20; now 174/174 across 12 slices).** The *harness* is built and verified; the
+  *effectiveness run itself* is **operator-gated** (needs a sandboxed, operator-
+  owned `rea` VM — no offensive tooling in the dev container):
+  - **CrackMe:** `harness/crackme/` — one source, two builds (`crackme_baseline`
+    flag plaintext / `crackme_hardened` flag string-encrypted + build-time guards +
+    post-build `carapace harden`). Flag plaintext never committed (env/`secret.local
+    .txt`/labelled default); `seal.py` publishes only `SEAL.json` (the digest).
+  - **Scorer:** `harness/measure/rea_measure.py` — honest by construction: a crack
+    counts only if it hashes to the seal; tokens/wall are agent-reported and absent
+    values read **not measured** (no estimate multipliers); honeytokens the agent
+    surfaced are scored as poison + attribution; caveats printed. `run-template.json`
+    is what the operator fills on the VM.
+  - **Runbook:** `docs/workflow/slice-k-empirical-runbook.md` (sandboxed VM, build →
+    run agent per variant → record → score → interpret; ethics/scope up top).
+  - **Verify:** `harness/verify/test_slice_k.sh` (**20/20**) proves the PLUMBING
+    (build/seal/verify round-trip, flag gone from hardened static view, honeytokens
+    + exhaustion present, scorer verifies crack vs seal, attributes a honeytoken,
+    multiplier from real inputs, "not measured" on absent data, readiness state) —
+    explicitly **not** the effectiveness claim, which only the VM run yields.
+
+## Status: absorption plan complete
+Every in-scope idea from the competitive scan is now folded in and
+mechanism-proven: **I** (exhaust), **J** (poison/honeytokens), **K** (empirical
+harness + CrackMe), **L** (one-command `harden` + install). The only things left
+are **operator decisions / operator-gated actions**, not pending build work.
+
+## Open items — operator decisions / gated (no in-flight build work)
+1. **Run Slice K for real.** Stand up the sandboxed, operator-owned `rea` VM and
+   follow the runbook to produce *measured* numbers. Blocked on the VM only.
+2. **Scope expansion** (the one real fork): native/mobile vs. adding Electron/JS/
+   Wasm/.NET = a **CLAUDE.md §2 change**. Recommendation unchanged: keep the
+   mechanism-proven native core; add a web/bundle track only as an explicit,
+   separately-tiered second track, never silently. Confirm before any such work.
+3. **PE/Mach-O reach** (in-scope, no VM, small): route the skill's `audit`/`report`
+   to the PE scanner by magic byte; then a Mach-O audit pass (third format). A good
+   next build increment if the operator wants to keep going without the VM.
 
 ## Roadmap — absorbed from the competitive scan (ordered)
 - **Slice I — Exhaust** — ✅ done.
 - **Slice J — Poison/Hallucinate depth (honeytokens/canaries)** — ✅ done.
-- **Slice K — Empirical validation + CrackMe** — ⚠ **operator-gated**: needs a
-  throwaway, operator-owned `rea` VM to measure decoy/exhaustion effect for real
-  (no offensive tooling in the dev container). Ship a Carapace CrackMe (digest-
-  sealed) built from our sample + slices. Produces *measured* numbers or none —
-  no vendor-style "internal estimate" multipliers.
+- **Slice K — Empirical harness + CrackMe + scorer** — ✅ harness done (plumbing
+  20/20); the digest-sealed CrackMe + honest scorer + runbook are built. The
+  effectiveness *run* is operator-gated (sandboxed `rea` VM) — see open item 1.
 - **Slice L — one-command `carapace harden` + skill `install`** — ✅ done (UX
   parity with `npx … harden .`, without faking build-time guards).
 - **PE/Mach-O reach** — wire PE into the skill's `audit`/`report` dispatch by
@@ -271,24 +295,11 @@ in-scope, no-VM next move.
 - **REJECTED as a defense:** instruction-file barriers / terminal shims (antirea
   style) — relies on a cooperative model; violates CLAUDE.md §2. Never scored.
 
-## Needs operator decision
-- **Scope expansion:** "have all things" vs Electron/JS/Wasm/.NET bundles is a
-  **CLAUDE.md §2 change**. Recommendation: keep native/mobile as the mechanism-
-  proven core (our edge); add a web/bundle track only as an explicit, separately-
-  tiered second track, never silently and never at the cost of "prove it".
-  Confirm before any web/bundle work starts.
-
-**Then / parked:** empirical AI-layer validation (decoy effectiveness,
-coverage-poisoning) still needs the sandboxed, operator-owned `rea` VM — do not
-install offensive tooling in the dev container.
-
 ## Parked / needs operator action
-- A **sandboxed, operator-owned `rea` install** (throwaway VM) is the only way to
-  resolve the deep open questions (authoritative `tools/list`, whether `rea`
-  screens Frida scripts, GDB/MI reality, stripped-binary decompile). Not required
-  for the implemented slices or the skill; it gates *empirical* validation of the
-  AI-layer claims (decoy effectiveness, coverage-poisoning). Do not install
-  offensive tooling in the dev container.
+- The **operator-owned `rea` VM** (open item 1) is also what resolves the deep
+  open questions about `rea` internals (authoritative `tools/list`, whether it
+  screens Frida scripts, GDB/MI reality, stripped-binary decompile). The Slice K
+  harness + runbook are ready to drive it; nothing else is blocked on it.
 - P0 entries still `list (verify in research)`: `disasm-mcp`+`agentic-re` are in
   analysis (via `rea.md`); the rest await their own research passes.
 
