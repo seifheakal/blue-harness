@@ -4,7 +4,7 @@
 > at the start and **updates it at the end** before handing off. This is how we
 > pass work between chats without dumping context. Keep it short and current.
 
-- Last updated: 2026-11-05
+- Last updated: 2026-11-11
 - Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–O ✅) → Testing ✅ (223/223 via `make verify`, enforced in CI) → all three native formats audited + ELF/Mach-O harden; open items are operator decisions (below)**
 - Competitive scan done (2026-11-05): `research/findings/2026-11-05-competitive-landscape.md`
   — peers now defend against AI-RE (BLA ~2.3k★ the serious one). Operator decision:
@@ -327,8 +327,16 @@ harness + CrackMe), **L** (one-command `harden` + install). The only things left
 are **operator decisions / operator-gated actions**, not pending build work.
 
 ## Open items — operator decisions / gated (no in-flight build work)
-1. **Run Slice K for real.** Stand up the sandboxed, operator-owned `rea` VM and
-   follow the runbook to produce *measured* numbers. Blocked on the VM only.
+1. **Run Slice K for real — ✅ DONE (2026-11-11).** Ran on an isolated,
+   operator-owned VM: baseline **CRACKED** (hash-verified, 1,256 tok / 1.6s) vs
+   hardened **not cracked** (16,785 tok / 195s; **13.4× tokens, 121.9× wall**) by
+   a local `qwen2.5-coder:7b` shell-agent. Defenses seen firing: string-encryption
+   (static grep empty), anti-debug (`strace`/`ltrace` refused), exhaustion (gdb/r2
+   timed out). Honest limits: single VM, one 7B, N=1; honeytokens did **not** fire
+   (agent blocked upstream); the agent was a **custom shell loop, not `rea`-via-
+   Codex** — commodity local models emit tool calls as unparsed JSON text (Codex +
+   Ollama both drop them), a P0-relevant friction finding. Detail + caveats:
+   `research/findings/2026-11-11-slice-k-empirical-run.md`.
 2. **Scope expansion** (the one real fork): native/mobile vs. adding Electron/JS/
    Wasm/.NET = a **CLAUDE.md §2 change**. Recommendation unchanged: keep the
    mechanism-proven native core; add a web/bundle track only as an explicit,
@@ -346,8 +354,9 @@ are **operator decisions / operator-gated actions**, not pending build work.
 - **Slice I — Exhaust** — ✅ done.
 - **Slice J — Poison/Hallucinate depth (honeytokens/canaries)** — ✅ done.
 - **Slice K — Empirical harness + CrackMe + scorer** — ✅ harness done (plumbing
-  20/20); the digest-sealed CrackMe + honest scorer + runbook are built. The
-  effectiveness *run* is operator-gated (sandboxed `rea` VM) — see open item 1.
+  20/20) **and run for real (2026-11-11)**: baseline cracked vs hardened not
+  (13.4× tokens, 121.9× wall) — see open item 1 and
+  `research/findings/2026-11-11-slice-k-empirical-run.md`.
 - **Slice L — one-command `carapace harden` + skill `install`** — ✅ done (UX
   parity with `npx … harden .`, without faking build-time guards).
 - **PE/Mach-O reach** — ✅ done: PE dispatch (Slice M) + Mach-O audit (Slice N);
@@ -357,10 +366,13 @@ are **operator decisions / operator-gated actions**, not pending build work.
   style) — relies on a cooperative model; violates CLAUDE.md §2. Never scored.
 
 ## Parked / needs operator action
-- The **operator-owned `rea` VM** (open item 1) is also what resolves the deep
-  open questions about `rea` internals (authoritative `tools/list`, whether it
-  screens Frida scripts, GDB/MI reality, stripped-binary decompile). The Slice K
-  harness + runbook are ready to drive it; nothing else is blocked on it.
+- The Slice K run (2026-11-11) used a **custom shell-agent**, not `rea` itself,
+  because commodity local models could not drive the `rea` MCP via Codex (tool
+  calls emitted as unparsed JSON text). So the deep `rea`-internals questions
+  (authoritative `tools/list`, Frida-script screening, GDB/MI reality, stripped
+  decompile) remain open, as does a re-run with a reliably tool-calling model
+  (e.g. Codex-native `gpt-oss`) and/or `rea` itself to exercise Slice J + the
+  decompiler path. Nothing is blocked on it.
 - P0 entries still `list (verify in research)`: `disasm-mcp`+`agentic-re` are in
   analysis (via `rea.md`); the rest await their own research passes.
 

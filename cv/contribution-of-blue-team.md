@@ -85,6 +85,32 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 
 ## Contribution Log (append after every bit — newest at top)
 
+### 2026-11-11
+- **Ran Slice K for real — the first *measured* RE-resistance before/after (isolated
+  operator VM).** Stood up a network-isolated, operator-owned VM and pointed a local
+  uncensored-class model (`qwen2.5-coder:7b`, served on the host GPU and reached over
+  an SSH reverse tunnel) at the CrackMe's baseline vs Carapace-hardened builds, then
+  scored the recorded runs with the honest scorer:
+  - **Baseline cracked, hardened resisted.** The same agent recovered the real flag
+    from the baseline in 1.6 s / 1,256 tokens (**hash-verified** against the seal),
+    but against the hardened build spent **13.4× the tokens and ~122× the wall-clock
+    and still failed** — its confident final answer did not hash to the seal.
+  - **Watched three Carapace defenses fire in sequence** on the hardened build:
+    string-encryption (every static `strings`/`objdump`/`nm`/`readelf`/`xxd` grep
+    for the flag came back empty), anti-debug guards (`strace` → *"tracer detected —
+    refusing to run"*; `ltrace` → breakpoint-tamper `SIGSEGV`), and analysis-surface
+    exhaustion (gdb/radare2 timed out on the 26×-larger binary) — after which the
+    model hallucinated a wrong flag.
+  - **Kept it honest, including where it falls short:** single VM, one 7B model,
+    N=1; the honeytoken/poison layer (Slice J) **did not fire** (the agent was
+    blocked upstream, not fooled by a decoy); and the agent was a **custom shell-tool
+    loop, not the `rea` MCP** — because commodity local models emit tool calls as
+    plain JSON text that neither Codex nor Ollama parses into executable calls
+    (reproduced by calling Ollama directly). That tool-call-parsing gap is itself a
+    P0-relevant finding: the AI-RE "skill-floor collapse" has real friction at the
+    lowest tier. Full writeup + caveats:
+    `research/findings/2026-11-11-slice-k-empirical-run.md`.
+
 ### 2026-11-05
 - **Shipped Implementation Slice O (Mach-O local-symbol strip — the first Mach-O
   harden, 15/15 green; 223/223 across 15 slices).** Built a dependency-free
