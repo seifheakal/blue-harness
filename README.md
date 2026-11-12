@@ -108,6 +108,14 @@ into reporting, a decoy, so Slice J's poison-and-attribution effect went
 unexercised in this run. It resisted here via encryption + anti-debug + exhaustion,
 not via the poison layer.
 
+**How we tested, and a call to arms.** Both testing layers — the `make verify`
+mechanism proofs and this empirical run — are documented in
+[**How we tested**](docs/HOW-WE-TESTED.md), with a step-by-step guide to
+re-running the measurement. It would be genuinely valuable if someone ran it
+against a **bigger model** (more VRAM, or a hosted frontier model): a stronger
+attacker would finally exercise Slice J, which ours never reached. Scored,
+hash-verified runs are very welcome by PR.
+
 Details and the attacker-weapon mapping: [`docs/re-techniques/rea.md`](docs/re-techniques/rea.md).
 
 ## What it is / what it isn't
@@ -162,6 +170,7 @@ each step.
 - [`harness/verify/`](harness/verify/) — the tests that prove each one fires (`run_all.sh`)
 - [`skill/`](skill/) — the Claude skill that drives it all
 - [`docs/`](docs/) — threat model, the RE catalog, and the worked countermeasure analysis
+- [`docs/HOW-WE-TESTED.md`](docs/HOW-WE-TESTED.md) — the two testing layers + how to re-run the measurement (bigger models welcome)
 - [`CLAUDE.md`](CLAUDE.md) — project constitution, scope & workflow
 
 ## How we compare
