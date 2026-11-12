@@ -1,9 +1,10 @@
 # harness/audit — exposure scanners (read-only)
 
-Two self-contained scanners (no external deps), one per native format. Each reads
+Three self-contained scanners (no external deps), one per native format. Each reads
 the **same signals an AI-assisted RE agent (e.g. `rea`) reads** from its static
-inspectors and scores them; neither modifies the target (audit before harden,
-CLAUDE.md §8).
+inspectors and scores them on the same tiers; none modifies the target (audit
+before harden, CLAUDE.md §8). The skill's `carapace audit`/`report` **auto-detects
+the format by magic byte** and routes to the right one (Slice M).
 
 - `elf_exposure_audit.py` — Linux **ELF** (the implemented countermeasures target
   this format).
@@ -13,6 +14,15 @@ CLAUDE.md §8).
   .NET/packer tells. `python3 pe_exposure_audit.py file.exe [--json]`. The honest
   note it prints: an Authenticode signature on disk is not itself a defense — rea
   only *reads* it; value comes from a runtime, server-checked signature.
+- `macho_exposure_audit.py` — macOS/iOS **Mach-O** (Slice N): thin 32/64-bit (both
+  byte orders) + fat/universal; reads the symbol-table size, `__TEXT,__cstring`
+  string density, section entropy, linked dylibs, PIE / stack-exec / `__RESTRICT`
+  flags, a code signature (**read-only — presence only, NOT verified**), and
+  `__TEXT` encryption (`LC_ENCRYPTION_INFO` cryptid — a static view of ciphertext).
+  `python3 macho_exposure_audit.py file [--json]`. Same honest note as PE: an
+  on-disk signature is read, not verified — value is in a runtime, server-checked
+  one; `__TEXT` encryption is an Apple-platform control, not something this harness
+  adds.
 
 ## `elf_exposure_audit.py`
 

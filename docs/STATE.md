@@ -4,8 +4,12 @@
 > at the start and **updates it at the end** before handing off. This is how we
 > pass work between chats without dumping context. Keep it short and current.
 
-- Last updated: 2026-10-26
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–G ✅) → Testing ✅ (99/99 via `make verify`) → Slice H ⬅ next**
+- Last updated: 2026-11-11
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–O ✅) → Testing ✅ (223/223 via `make verify`, enforced in CI) → all three native formats audited + ELF/Mach-O harden; open items are operator decisions (below)**
+- Competitive scan done (2026-11-05): `research/findings/2026-11-05-competitive-landscape.md`
+  — peers now defend against AI-RE (BLA ~2.3k★ the serious one). Operator decision:
+  **absorb their good ideas into Carapace** ("engulf"), keeping our native-depth +
+  mechanism-proof edge. Absorb ideas, not their MIT code (clean-room).
 - Worked specimen: **`rea`** (morluto/rea, npm `rea-agents`) — the P0 reference.
 
 ## Done so far
@@ -154,29 +158,221 @@
     Authenticode read-only; packer (UPX0 + high entropy); score soft(77)→hard(15);
     non-PE rejected gracefully. `make verify` now **99/99 across 7 slices**.
 
-## Next step (decided)
-**Slice H — CI that runs `make verify` on every push/PR.** The repo proves itself
-locally (99/99) but nothing enforces it on a change. Add `.github/workflows/
-verify.yml` (Ubuntu, gcc + python3, `make verify`) plus a status line/badge in the
-README so a regression in any slice fails visibly. Small, high-legibility, and it
-locks in the "prove it" guarantee for the CV/GitHub audience. No new countermeasure.
+- **Implementation — Slice H ✅ (CI that enforces `make verify` on every
+  push/PR).** No new countermeasure — it locks in the "prove it" guarantee:
+  - **Workflow:** `.github/workflows/verify.yml` — Ubuntu runner, runs
+    `make verify` on every `push` (all branches) and every `pull_request`.
+    `concurrency` cancels superseded runs on the same ref; `permissions:
+    contents: read` (least privilege). Installs **gdb** so Slice A's under-tracer
+    detection branch runs (not skips), and sets `kernel.yama.ptrace_scope=0` so
+    Slice A's anti-ptrace *control* (a sibling probe attaching to the unhardened
+    baseline) works as designed. Neither weakens the test — the guards proven are
+    in the binary, not the host policy. The real-core end-to-end check in Slice A
+    self-skips on CI (apport `core_pattern`) and relies on its mechanism proof, as
+    designed.
+  - **Badge:** `README.md` carries the Actions status badge in the header and the
+    Status section now says the gate is CI-enforced.
+  - **Verify:** `harness/verify/test_slice_h.sh` (**9/9**) — a static *config lint*
+    (does not launch Actions): asserts the workflow exists, triggers on push +
+    pull_request, actually runs `make verify`, keeps both Slice-A accommodations
+    (gdb + ptrace_scope), pins the checkout action, runs on Ubuntu, and that the
+    README advertises the badge. So a future edit that silently drops the gate or
+    an accommodation is caught by `make verify` itself. Negative-tested: the lint
+    fails when the `make verify` step is removed.
+  - `make verify` now **108/108 across 8 slices**.
 
-**Follow-ons / parked:** a Mach-O audit pass (third format); wiring PE into the
-skill's `audit`/`report` dispatch by magic; and the empirical AI-layer validation
-(decoy effectiveness, coverage-poisoning) that still needs the sandboxed,
-operator-owned `rea` VM — do not install offensive tooling in the dev container.
+- **Implementation — Slice I ✅ (analysis-surface Exhaust; 14/14; now 122/122
+  across 9 slices).** Absorbed the peers' "Exhaust" axis into our native lane,
+  mechanism-proven (not a size diff):
+  - **Harden:** `harness/harden/carapace_exhaust.py` — post-build `objcopy` pass,
+    two non-breaking levers: decoy **non-alloc** sections (`.carapace_exh_*`,
+    SHF_ALLOC clear → never mapped at runtime) + synthetic **LOCAL FUNC** symbols
+    (`carapace_exh_fn_*`, `.symtab` only → exports/`.dynsym` untouched).
+    Deterministic (seeded) for reproducible builds.
+  - **Audit:** `exhaustion_present` + measured `exhaust_decoy_bytes` /
+    `exhaust_synth_symbols` / `nonalloc_byte_ratio` (guards section, not the main
+    score).
+  - **Skill:** added the `exhaustion` recommendation (post-build; tier + named
+    bypass; not re-recommended when present).
+  - **Verify:** `harness/verify/test_slice_i.sh` (**14/14**) — audit flips +
+    measures; runtime output **byte-identical**, app still runs, **`.dynsym`
+    byte-identical** (dynamic linking intact); decoy sections proven **non-alloc**;
+    300 synthetic FUNC in `.symtab`, **zero** leaked into `.dynsym`; deterministic.
+  - Tier **Trivial→Speed-bump** (Speed-bump vs the naive ingest-everything agent —
+    the commodity path; Trivial vs anyone who filters). Named bypass: filter to
+    SHF_ALLOC sections + code-referenced symbols. COST, not prevention.
 
-**Then / parked:** empirical AI-layer validation (decoy effectiveness,
-coverage-poisoning) still needs the sandboxed, operator-owned `rea` VM — do not
-install offensive tooling in the dev container.
+- **Implementation — Slice J ✅ (honeytokens / canaries; Poison + attribution;
+  15/15; now 137/137 across 10 slices).** The Poison/Hallucinate play, our way:
+  - **Harden:** `harness/harden/carapace_honeytokens.py` — `plant` drops N
+    plausible, format-valid FAKE secrets (AWS-style keys, bearer tokens, internal
+    URLs, DB creds) into a non-alloc section (default `.carapace_honey`; never
+    mapped → byte-identical runtime, provably unreferenced decoys) yet
+    strings-visible, and writes a **private ledger** (unique token values per
+    build). `check` matches a leaked token back to its exact build (canary).
+    Deterministic (seeded).
+  - **Audit:** `honeytokens_present` + `honeytoken_count` (guards section).
+  - **Skill:** `honeytokens` recommendation (post-build; tier + named bypass +
+    keep-ledger-private note).
+  - **Verify:** `harness/verify/test_slice_j.sh` (**15/15**) — audit flips+counts;
+    tokens unique + plausible (AKIA shape) + strings-visible; runtime
+    byte-identical, app runs, `.dynsym` untouched, honey section proven non-alloc;
+    attribution hits a leak (rc=7) + no false positive + unique per build;
+    deterministic.
+  - Tier **Speed-bump** (poison / time-waste) / **Meaningful FOR DETECTION**
+    (attribution). Named bypass: xref-validate drops unreferenced tokens; the
+    default section name is a tell (rename for production). Detects/attributes a
+    crack — does not prevent it.
+
+- **Implementation — Slice L ✅ (one-command `harden` + skill `install`; UX parity;
+  17/17; now 154/154 across 11 slices).** Closed the ergonomics gap vs the peers'
+  `npx … harden .`, honestly:
+  - **Skill:** `skill/carapace.py harden <bin>` chains every applicable POST-BUILD
+    pass in a safe order (identity decoy → exhaust → honeytokens), writes
+    `<bin>.hardened` + the PRIVATE map/ledger, then prints the build-time guards it
+    did **not** apply (with the rebuild step) and the server-side Strong tier — it
+    never fakes a build-time guard. `carapace install [--user|--dir]` symlinks the
+    skill into `.claude/skills/carapace` (idempotent; refuses to clobber a real dir).
+  - **Front door:** `make harden BIN=…` and `make install-skill`.
+  - **Verify:** `harness/verify/test_slice_l.sh` (**17/17**) — harden applies all 3
+    post-build passes (map + exhaustion + honeytokens present), runtime
+    byte-identical, defers the 5 build-time guards honestly, surfaces the Strong
+    tier, tier+bypass on every applied item, no overclaim; install creates a working
+    link, is idempotent, and refuses to clobber a real dir (rc=2).
+  - `.gitignore`: harden/apply outputs under `harness/sample/` ignored (never ship
+    the private keys). SKILL.md refreshed (removed the stale "roadmap" line — string
+    encryption shipped in Slice F).
+
+- **Implementation — Slice K ✅ (empirical harness + CrackMe + scorer; plumbing
+  20/20; now 174/174 across 12 slices).** The *harness* is built and verified; the
+  *effectiveness run itself* is **operator-gated** (needs a sandboxed, operator-
+  owned `rea` VM — no offensive tooling in the dev container):
+  - **CrackMe:** `harness/crackme/` — one source, two builds (`crackme_baseline`
+    flag plaintext / `crackme_hardened` flag string-encrypted + build-time guards +
+    post-build `carapace harden`). Flag plaintext never committed (env/`secret.local
+    .txt`/labelled default); `seal.py` publishes only `SEAL.json` (the digest).
+  - **Scorer:** `harness/measure/rea_measure.py` — honest by construction: a crack
+    counts only if it hashes to the seal; tokens/wall are agent-reported and absent
+    values read **not measured** (no estimate multipliers); honeytokens the agent
+    surfaced are scored as poison + attribution; caveats printed. `run-template.json`
+    is what the operator fills on the VM.
+  - **Runbook:** `docs/workflow/slice-k-empirical-runbook.md` (sandboxed VM, build →
+    run agent per variant → record → score → interpret; ethics/scope up top).
+  - **Verify:** `harness/verify/test_slice_k.sh` (**20/20**) proves the PLUMBING
+    (build/seal/verify round-trip, flag gone from hardened static view, honeytokens
+    + exhaustion present, scorer verifies crack vs seal, attributes a honeytoken,
+    multiplier from real inputs, "not measured" on absent data, readiness state) —
+    explicitly **not** the effectiveness claim, which only the VM run yields.
+
+- **Implementation — Slice M ✅ (format dispatch; PE reach; 13/13; now 187/187
+  across 13 slices).** The Slice-G PE scanner was only reachable via
+  `make audit-pe`; now the skill detects the format by magic byte and routes the
+  one front door:
+  - **Skill:** `_detect_format` (ELF `\x7fELF` / PE `MZ` / Mach-O magics) drives
+    `carapace audit`/`report`/`recommend` to the right scanner; PE renders the PE
+    audit + the format-independent server-side Strong truth. `apply`/`harden`
+    **refuse** a non-ELF with guidance (rc 3) rather than mangling it — the ELF
+    transforms are not pretended onto a PE. Unknown blobs error cleanly (rc 2, no
+    traceback).
+  - **Verify:** `harness/verify/test_slice_m.sh` (**13/13**) — audit routes ELF→ELF
+    and PE→PE; PE report carries the audit + server-side truth and no ELF-only
+    hardening; apply/harden refuse a PE and leave it byte-identical; ELF path
+    unregressed; unsupported blob handled cleanly. Mach-O magic is already detected
+    (wired lazily) — the scanner itself lands in Slice N.
+
+- **Implementation — Slice N ✅ (Mach-O exposure audit — the third format; 21/21;
+  now 208/208 across 14 slices).** Completes the native-format audit trio:
+  - **Audit:** `harness/audit/macho_exposure_audit.py` — self-contained Mach-O
+    parser (thin 32/64-bit, both byte orders, + fat/universal). Reads symbol-table
+    size, `__TEXT,__cstring` density, section entropy, linked dylibs, PIE /
+    stack-exec / `__RESTRICT` flags, a code signature (**read-only — presence only,
+    not verified**), and `__TEXT` encryption (`LC_ENCRYPTION_INFO` cryptid). Scored
+    + tiered parallel to the ELF/PE scanners. `make audit-macho BIN=…`.
+  - **Fixture:** `harness/sample/macho_fixture.py` — toolchain-free generator
+    (soft/hard/encrypted + a fat wrapper) so verify needs no Apple toolchain.
+  - **Skill:** the Slice-M magic-byte dispatch now has a live Mach-O target
+    (`audit`/`report`/`recommend` route it; `apply`/`harden` refuse it honestly).
+  - **Verify:** `harness/verify/test_slice_n.sh` (**21/21**) — header/arch/filetype,
+    symtab + `__cstring` + dylibs parsed; soft→hard flip (stripped + PIE +
+    `__RESTRICT` + signed; score 64→18, tier changes); `__TEXT` encryption craters
+    the score to 0; fat parsed; code-signature read-only note; skill routes Mach-O;
+    non-Mach-O rejected cleanly.
+
+- **Implementation — Slice O ✅ (Mach-O local-symbol strip — first Mach-O harden;
+  15/15; now 223/223 across 15 slices).** The Mach-O analog of the ELF identity
+  strip, platform-honest:
+  - **Harden:** `harness/harden/carapace_macho_strip.py` — byte-level `strip -x`
+    (no Apple/LLVM toolchain): removes LOCAL/static symbols via `LC_SYMTAB` +
+    `LC_DYSYMTAB`, preserves external/undefined (dyld needs them), keeps all load
+    commands/segments/sections and **file offsets stable** (in-place, size
+    unchanged). Refuses fat / empty-symtab / no-`LC_DYSYMTAB` with guidance; warns
+    if code-signed (strip → codesign order). Deterministic.
+  - **Fixture:** `macho_fixture.py` now emits `LC_DYSYMTAB` + a local/external
+    split so the strip is meaningful and testable.
+  - **Skill:** `carapace apply <macho>` now dispatches to the strip (ELF `apply`
+    unchanged; `harden` full-chain stays ELF-only). `make harden-macho BIN=…`.
+  - **Verify:** `harness/verify/test_slice_o.sh` (**15/15**) — locals gone +
+    externals preserved; symbol_count 6→2; size stable; segments/sections/dylibs
+    byte-identical; still parses; deterministic; runtime caveat printed; fat /
+    no-symbol inputs refused; skill drives it.
+  - **Honest limit:** we can't execute a Mach-O on Linux, so this is a
+    **structural** proof; **runtime-identical is platform-gated to a macOS host**
+    (stated in the tool + verify, like the Slice K VM). Tier Speed-bump→Meaningful;
+    bypass: exported names remain, behavior recoverable.
+
+## Status: absorption plan complete
+Every in-scope idea from the competitive scan is now folded in and
+mechanism-proven: **I** (exhaust), **J** (poison/honeytokens), **K** (empirical
+harness + CrackMe), **L** (one-command `harden` + install). The only things left
+are **operator decisions / operator-gated actions**, not pending build work.
+
+## Open items — operator decisions / gated (no in-flight build work)
+1. **Run Slice K for real — ✅ DONE (2026-11-11).** Ran on an isolated,
+   operator-owned VM: baseline **CRACKED** (hash-verified, 1,256 tok / 1.6s) vs
+   hardened **not cracked** (16,785 tok / 195s; **13.4× tokens, 121.9× wall**) by
+   a local `qwen2.5-coder:7b` shell-agent. Defenses seen firing: string-encryption
+   (static grep empty), anti-debug (`strace`/`ltrace` refused), exhaustion (gdb/r2
+   timed out). Honest limits: single VM, one 7B, N=1; honeytokens did **not** fire
+   (agent blocked upstream); the agent was a **custom shell loop, not `rea`-via-
+   Codex** — commodity local models emit tool calls as unparsed JSON text (Codex +
+   Ollama both drop them), a P0-relevant friction finding. Detail + caveats:
+   `research/findings/2026-11-11-slice-k-empirical-run.md`.
+2. **Scope expansion** (the one real fork): native/mobile vs. adding Electron/JS/
+   Wasm/.NET = a **CLAUDE.md §2 change**. Recommendation unchanged: keep the
+   mechanism-proven native core; add a web/bundle track only as an explicit,
+   separately-tiered second track, never silently. Confirm before any such work.
+3. **PE/Mach-O reach** — ✅ DONE. PE dispatch (Slice M) + Mach-O audit (Slice N) +
+   Mach-O local-symbol **harden** (Slice O). All three native formats are audited
+   and auto-detected; ELF and Mach-O have a post-build harden path. Possible future
+   increments (in-scope, no VM): more Mach-O harden (decoy/exhaust/honeytokens as
+   added segments — trickier than ELF, needs care without a macOS host to verify),
+   a PE harden path, and mobile-container reach (APK `.so` / iOS). None pressing;
+   raise with the operator before starting. **Mach-O runtime verification is
+   platform-gated to a macOS host** (same class of gating as open item 1's VM).
+
+## Roadmap — absorbed from the competitive scan (ordered)
+- **Slice I — Exhaust** — ✅ done.
+- **Slice J — Poison/Hallucinate depth (honeytokens/canaries)** — ✅ done.
+- **Slice K — Empirical harness + CrackMe + scorer** — ✅ harness done (plumbing
+  20/20) **and run for real (2026-11-11)**: baseline cracked vs hardened not
+  (13.4× tokens, 121.9× wall) — see open item 1 and
+  `research/findings/2026-11-11-slice-k-empirical-run.md`.
+- **Slice L — one-command `carapace harden` + skill `install`** — ✅ done (UX
+  parity with `npx … harden .`, without faking build-time guards).
+- **PE/Mach-O reach** — ✅ done: PE dispatch (Slice M) + Mach-O audit (Slice N);
+  the skill auto-detects ELF/PE/Mach-O. A Mach-O/PE *harden* path (beyond audit)
+  remains a possible future increment.
+- **REJECTED as a defense:** instruction-file barriers / terminal shims (antirea
+  style) — relies on a cooperative model; violates CLAUDE.md §2. Never scored.
 
 ## Parked / needs operator action
-- A **sandboxed, operator-owned `rea` install** (throwaway VM) is the only way to
-  resolve the deep open questions (authoritative `tools/list`, whether `rea`
-  screens Frida scripts, GDB/MI reality, stripped-binary decompile). Not required
-  for the implemented slices or the skill; it gates *empirical* validation of the
-  AI-layer claims (decoy effectiveness, coverage-poisoning). Do not install
-  offensive tooling in the dev container.
+- The Slice K run (2026-11-11) used a **custom shell-agent**, not `rea` itself,
+  because commodity local models could not drive the `rea` MCP via Codex (tool
+  calls emitted as unparsed JSON text). So the deep `rea`-internals questions
+  (authoritative `tools/list`, Frida-script screening, GDB/MI reality, stripped
+  decompile) remain open, as does a re-run with a reliably tool-calling model
+  (e.g. Codex-native `gpt-oss`) and/or `rea` itself to exercise Slice J + the
+  decompiler path. Nothing is blocked on it.
 - P0 entries still `list (verify in research)`: `disasm-mcp`+`agentic-re` are in
   analysis (via `rea.md`); the rest await their own research passes.
 

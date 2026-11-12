@@ -237,6 +237,8 @@ research/
   findings/                 ← dated, structured research outputs
 skill/                      ← the Claude skill that drives the harness
 harness/                    ← the hardening & audit harness itself
+  crackme/                  ← the digest-sealed CrackMe for empirical measurement (Slice K)
+  measure/                  ← the honest before/after scorer for operator-VM agent runs
 .claude/
   agents/                   ← subagent role definitions (Scout, Builder, Evaluator, Lead)
 ```

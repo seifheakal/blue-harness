@@ -148,3 +148,107 @@ binary, so an attacker recovers plaintext **at rest** (re-run the keystream) or
 lifts the decoded string from **memory at runtime** (Frida/GDB). This raises cost
 against static/one-shot AI analysis; it is **not a secret store** — a secret that
 truly can't leak belongs server-side (the only Strong tier).
+
+---
+
+## Analysis-surface exhaustion (Slice I) — vs the naive "ingest everything" agent
+
+Absorbs the commodity AI-RE defender "Exhaust" axis into our native lane, and —
+unlike a peer's size-diff "verify" — we **prove** the cost lands on the analyst's
+surface, not on the program. Operates on the compiled ELF via `objcopy` (two
+non-breaking levers), post-build.
+
+```
+python3 carapace_exhaust.py sample_dev sample_dev.exh \
+        --sections 4 --section-size 131072 --symbols 300
+```
+
+| Lever | What it adds | Why it's non-breaking |
+|---|---|---|
+| Decoy **non-alloc** sections (`.carapace_exh_*`) | N×`SHT_PROGBITS` with **SHF_ALLOC clear** | the loader never maps a non-alloc section → zero runtime cost, zero behaviour change |
+| Synthetic **LOCAL FUNC** symbols (`carapace_exh_fn_*`) | M entries in `.symtab` only | LOCAL + symtab-only → `.dynsym`/exports and dynamic linking untouched |
+
+A naive agent that inventories and dumps every section / enumerates every symbol
+pays the full token/context cost of the inflated surface; its inventory can
+truncate. Output is **deterministic** (seeded), so builds are reproducible and the
+verify can assert byte-identical *runtime* behaviour against a clean baseline.
+
+**Tier: Trivial→Speed-bump** (Speed-bump vs a naive ingest-everything agent — the
+commodity-cracking path; Trivial vs anyone who filters). **Named bypass:** restrict
+analysis to allocated/executable (`SHF_ALLOC`) sections and to code-referenced
+symbols — our decoys are never mapped and our synthetic symbols are never called,
+so a one-line filter drops them. **Cost, not prevention.** Pairs with the identity
+transform: exhaust **after** decoying so the surface stays plausible.
+
+Proof it fires + is non-breaking (runtime byte-identical, exports intact, decoys
+non-alloc, no `.dynsym` pollution): `../verify/test_slice_i.sh`.
+
+---
+
+## Honeytokens / canaries (Slice J) — Poison + Hallucinate + attribution
+
+Plants **plausible, format-valid fake secrets** (AWS-style keys, bearer tokens,
+internal URLs, DB creds) so a naive AI-RE agent mines them and reports them as
+real **findings** — poisoning its output and, per Quarkslab's observation that
+agents confidently report plausible-but-wrong results, amplifying a
+**hallucinated** conclusion the attacker then wastes time on. Every token is
+**unique per build** and recorded in a **private ledger**, so it is also an
+**attribution tripwire**: if one surfaces in a leaked crack, `check` matches it
+back to the exact build.
+
+```
+python3 carapace_honeytokens.py plant sample_dev sample_dev.honey \
+        --ledger private_ledger.json --count 10 --build-tag 2026-11-05-rc1
+python3 carapace_honeytokens.py check --ledger private_ledger.json --input leak.txt
+```
+
+Placement: a **non-allocated** section (default `.carapace_honey`) — never mapped
+at runtime, so the program is byte-identical and the tokens are provably
+unreferenced decoys, yet still visible to a whole-file `strings` / `list_strings`
+scan (the naive agent's mining path). Deterministic (seeded) for reproducible
+builds + ledger.
+
+**Tier:** *Speed-bump* as poison / time-waste (a careful analyst xref-validates a
+"secret" and discards one nothing references); **Meaningful FOR DETECTION** as an
+attribution tripwire — a unique token leaking is strong evidence the build was
+reversed and names which build, but it is after-the-fact, **never prevention**.
+**Named bypass:** behavioural validation drops unreferenced tokens; the default
+section name is a tell (rename/randomise with `--section` for production; the
+strongest blend is compiling decoys into real `.rodata` at build time — a
+follow-on). A honeytoken is **not** a real secret.
+
+Keep the ledger **PRIVATE** (out of the shipped artifact) — it is the key that
+makes attribution work. Proof it fires + is non-breaking + attribution/uniqueness:
+`../verify/test_slice_j.sh`.
+
+---
+
+## Mach-O local-symbol strip (Slice O) — the first Mach-O harden
+
+`carapace_macho_strip.py` removes the **LOCAL** (static / internal) symbols from a
+Mach-O's symbol table — exactly what `strip -x` does — so an AI-RE agent loses the
+internal names it mines, while the **external / undefined** symbols the dynamic
+linker needs are preserved. Byte-level, **no Apple/LLVM toolchain**, via
+`LC_SYMTAB` + `LC_DYSYMTAB`.
+
+```
+python3 carapace_macho_strip.py --in app --out app.stripped      # or: carapace apply app
+```
+
+| Property | Result |
+|---|---|
+| local (static) symbols | removed (names gone from the bytes) |
+| external / undefined symbols | preserved (dyld needs them) |
+| segments / sections / file offsets | byte-identical (in-place, size stable) |
+| fat/universal, empty symtab, no `LC_DYSYMTAB` | refused with guidance |
+
+**Honest limit (CLAUDE.md §3):** we run on Linux and **cannot execute a Mach-O**,
+so — unlike the ELF transforms — we do **not** claim runtime-identical here. The
+verify proves the transform is **surgical** (only the local nlist entries + their
+strings go; everything else is preserved); **runtime-identical is platform-gated
+to a macOS host**. Stripping also invalidates an existing code signature, so the
+correct order is strip → codesign on the build host (the tool warns if signed).
+
+**Tier:** *Speed-bump→Meaningful*. **Named bypass:** the exported names remain and
+a thorough agent recovers logic from behavior/xrefs regardless of names. Proof
+(structural): `../verify/test_slice_o.sh`.

@@ -85,7 +85,167 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 
 ## Contribution Log (append after every bit — newest at top)
 
+### 2026-11-11
+- **Ran Slice K for real — the first *measured* RE-resistance before/after (isolated
+  operator VM).** Stood up a network-isolated, operator-owned VM and pointed a local
+  uncensored-class model (`qwen2.5-coder:7b`, served on the host GPU and reached over
+  an SSH reverse tunnel) at the CrackMe's baseline vs Carapace-hardened builds, then
+  scored the recorded runs with the honest scorer:
+  - **Baseline cracked, hardened resisted.** The same agent recovered the real flag
+    from the baseline in 1.6 s / 1,256 tokens (**hash-verified** against the seal),
+    but against the hardened build spent **13.4× the tokens and ~122× the wall-clock
+    and still failed** — its confident final answer did not hash to the seal.
+  - **Watched three Carapace defenses fire in sequence** on the hardened build:
+    string-encryption (every static `strings`/`objdump`/`nm`/`readelf`/`xxd` grep
+    for the flag came back empty), anti-debug guards (`strace` → *"tracer detected —
+    refusing to run"*; `ltrace` → breakpoint-tamper `SIGSEGV`), and analysis-surface
+    exhaustion (gdb/radare2 timed out on the 26×-larger binary) — after which the
+    model hallucinated a wrong flag.
+  - **Kept it honest, including where it falls short:** single VM, one 7B model,
+    N=1; the honeytoken/poison layer (Slice J) **did not fire** (the agent was
+    blocked upstream, not fooled by a decoy); and the agent was a **custom shell-tool
+    loop, not the `rea` MCP** — because commodity local models emit tool calls as
+    plain JSON text that neither Codex nor Ollama parses into executable calls
+    (reproduced by calling Ollama directly). That tool-call-parsing gap is itself a
+    P0-relevant finding: the AI-RE "skill-floor collapse" has real friction at the
+    lowest tier. Full writeup + caveats:
+    `research/findings/2026-11-11-slice-k-empirical-run.md`.
+
+### 2026-11-05
+- **Shipped Implementation Slice O (Mach-O local-symbol strip — the first Mach-O
+  harden, 15/15 green; 223/223 across 15 slices).** Built a dependency-free
+  `strip -x` equivalent that removes a Mach-O's LOCAL/static symbols via
+  `LC_SYMTAB` + `LC_DYSYMTAB` while preserving the external/undefined symbols the
+  dynamic linker needs — keeping every load command, segment, section and file
+  offset byte-identical (surgical, in-place, deterministic), and refusing unsafe
+  inputs (fat, empty/undeclared symbol tables). Drew the honesty line precisely:
+  because a Mach-O can't be executed on the Linux build host, the verify proves the
+  transform is *surgical* (locals gone, externals kept, nothing else moved) and the
+  tool states plainly that *runtime-identical* confirmation is platform-gated to a
+  macOS host — no overclaiming. Wired it into `carapace apply` and `make
+  harden-macho`.
+- **Shipped Implementation Slice N (Mach-O exposure audit — the third native
+  format, 21/21 green; 208/208 across 14 slices).** Wrote a dependency-free Mach-O
+  parser (thin 32/64-bit, both byte orders, and fat/universal) that reads what an
+  AI-RE agent reads — symbol-table size, `__TEXT,__cstring` string density, section
+  entropy, linked dylibs, PIE / stack-exec / `__RESTRICT` flags, a code signature
+  (kept honest: presence only, **not** verified), and `__TEXT` encryption — and
+  scores a posture tier parallel to the ELF and PE scanners. Made it testable with
+  **zero Apple toolchain** via a byte-level fixture generator (soft/hard/encrypted
+  + a fat wrapper) driving a 21-check verify (soft→hard flip, encryption cratering
+  the static-view score, fat parsing, skill dispatch). With Slice M's magic-byte
+  routing, Carapace now audits **all three native formats (ELF/PE/Mach-O)** from one
+  `carapace audit <bin>`.
+- **Shipped Implementation Slice M (format dispatch, 13/13 green; 187/187 across
+  13 slices).** Unified the audit front door across formats: the skill now detects
+  ELF / PE / Mach-O by magic byte and routes `audit`/`report`/`recommend` to the
+  right scanner, so the Windows-PE audit (built in Slice G) is reachable through
+  the same `carapace audit <bin>` an operator already uses for ELF. Kept it honest
+  — the ELF-only post-build transforms (`apply`/`harden`) **refuse** a non-ELF with
+  guidance and leave it untouched rather than pretending, and an unrecognized file
+  errors cleanly. The server-side Strong truth is surfaced regardless of format.
+- **Shipped Implementation Slice K (empirical harness + CrackMe + honest scorer,
+  plumbing 20/20 green; 174/174 across 12 slices).** Built the apparatus to put
+  *measured* numbers on the hardening — the empirical claim the competitive space
+  makes with "internal estimate" multipliers — but honest by construction:
+  - A digest-sealed **CrackMe** (one source, baseline vs Carapace-hardened) whose
+    flag plaintext is never committed; only its SHA-256 is published, so a claimed
+    crack is verifiable without shipping the answer.
+  - An **honest scorer** that turns an operator's recorded agent runs into a
+    before/after: a "crack" counts only if it hashes to the seal (the agent's
+    self-report isn't trusted), token/wall figures are agent-reported with absent
+    values shown as *not measured* (never estimated), and a honeytoken the agent
+    reported as a secret is scored as poison + attribution.
+  - A **runbook** for running a real AI-RE agent against the pair on a sandboxed,
+    operator-owned VM — with the ethics/scope guardrail that offensive tooling is
+    never installed in the dev/CI container.
+  - Scoped the honesty precisely: the verify proves the *plumbing* (20/20); the
+    effectiveness claim is explicitly gated on the operator VM run, not asserted.
+- **Shipped Implementation Slice L (one-command `harden` + skill install, 17/17
+  green; 154/154 across 11 slices).** Matched the competitive space's one-command
+  ergonomics without sacrificing honesty:
+  - Added `carapace harden <binary>` — a single command that chains every
+    applicable post-build pass (identity decoy → analysis-surface exhaustion →
+    honeytokens), emits the hardened binary plus its private map/ledger, and then
+    **plainly lists the build-time guards it did not apply** (with the rebuild
+    step) and the server-side Strong tier. It refuses to fake a build-time guard
+    onto an already-built binary — the exact honesty line a convenience command is
+    tempted to cross.
+  - Added `carapace install` (+ `make harden` / `make install-skill`) for
+    one-command skill loading; idempotent and guarded against clobbering a real
+    directory.
+  - Verified the whole flow (post-build passes applied, runtime byte-identical,
+    build-time deferred, Strong surfaced, tier+bypass on every item, no overclaim),
+    and refreshed the skill docs (retiring a stale "not yet implemented" note now
+    that string encryption ships).
+- **Shipped Implementation Slice J (honeytokens / canaries, 15/15 green; 137/137
+  across 10 slices).** The "Poison / Hallucinate" axis of the competitive space,
+  built as a real blue-team canary primitive:
+  - Plants plausible, format-valid **fake secrets** (AWS-style keys, bearer
+    tokens, internal URLs, DB creds) that a naive AI-RE agent mines and reports as
+    real findings — poisoning its output and baiting the confident-but-wrong
+    conclusions agents are known to produce.
+  - Made each token **unique per build** and logged to a **private ledger**, so it
+    doubles as an **attribution tripwire**: a `check` tool matches a leaked token
+    back to the exact build that leaked (demonstrated end-to-end — leak detected,
+    build attributed, no false positives, unique across builds).
+  - Proved non-breakage at mechanism level (runtime byte-identical, exports
+    untouched, the decoy section provably non-allocated so the tokens are inert),
+    kept the output deterministic, and wired audit detection + a skill
+    recommendation.
+  - Honest tiering: **Speed-bump** as poison, **Meaningful for detection** as a
+    canary — explicitly *detection/attribution, not prevention* — with the exact
+    bypass named (xref-validation drops unreferenced tokens; rename the tell-tale
+    section for production).
+- **Shipped Implementation Slice I (analysis-surface exhaustion, 14/14 green;
+  122/122 across 9 slices).** Absorbed the competitive space's "Exhaust" axis into
+  Carapace's native lane — and did it in our mechanism-proven style, not a peer's
+  size-diff "verify":
+  - Built a post-build pass (`carapace_exhaust.py`, binutils only) with two
+    provably non-breaking levers — **decoy non-allocated sections** (never mapped
+    at runtime) and **synthetic LOCAL FUNC symbols** (`.symtab`-only) — that
+    balloon the inventory and context budget a naive "ingest everything" AI-RE
+    agent must pay, while the program is byte-identical.
+  - Proved non-breakage at mechanism level: runtime output byte-identical, exports
+    (`.dynsym`) untouched, decoy sections verified SHF_ALLOC-clear, zero synthetic
+    symbols leaking into the dynamic table, and deterministic (reproducible) output.
+  - Extended the audit to detect + *measure* it (decoy bytes, synthetic-symbol
+    count, non-alloc byte ratio) and wired an honest recommendation into the skill.
+  - Kept it honest: tier **Trivial→Speed-bump** with the exact bypass named (filter
+    to allocated sections + code-referenced symbols) — cost against the commodity
+    automated path, not prevention.
+- **Ran a competitive-landscape scan of the emerging anti-AI-RE defender space and
+  turned it into an absorption plan.** Found three public defenders (notably **BLA**,
+  ~2.3k★, MIT) now shipping against AI-RE agents like `rea`/REA — independent
+  validation of the project's thesis. Wrote a cited finding
+  (`research/findings/2026-11-05-competitive-landscape.md`) with a
+  technique-by-technique **absorption matrix**: identified Carapace's durable edge
+  (native-depth, *mechanism-proven firing* vs. the peers' self-admitted drift-check
+  "verify," and a named bypass + honest tier on every defense), folded their best
+  ideas (analysis-surface **exhaustion**, decoy/poison depth, an empirical REA
+  benchmark + CrackMe, one-command UX) into the Carapace roadmap, and **rejected on
+  principle** the instruction-file/terminal-shim "barriers" that rely on a
+  cooperative model (the exact non-defense the project forbids). Flagged the one
+  real fork — expanding past native/mobile into web/bundle formats — as an explicit
+  operator scope decision rather than silent scope creep.
+
 ### 2026-11-04
+- **Shipped Implementation Slice H (CI that enforces `make verify`, 9/9 green;
+  108/108 across all slices).** Turned the "prove it" claim from a local run into
+  an enforced gate:
+  - Added a **GitHub Actions workflow** (`.github/workflows/verify.yml`) that runs
+    the full `make verify` suite on every push and pull request, so a regression in
+    any of the eight slices fails the check and turns the README status badge red.
+  - Handled the two CI-environment subtleties honestly rather than weakening the
+    tests: installed **gdb** so Slice A's under-tracer detection branch actually
+    runs, and relaxed **Yama `ptrace_scope`** so the anti-ptrace *control* (a
+    sibling attaching to the unhardened baseline) runs as designed — the guards
+    being proven live in the binary, not the host policy. Scoped the workflow to
+    least privilege (`contents: read`) with superseded-run cancellation.
+  - Kept the gate self-checking: a **config-lint verify slice**
+    (`test_slice_h.sh`) asserts the workflow still runs `make verify` and still
+    carries both accommodations and the badge, and is negative-tested to fail when
+    the gate is removed — so the CI wiring can't silently rot.
 - **Shipped Implementation Slice G (PE/Windows exposure audit, 24/24 green; 99/99
   across all slices).** Broadened the harness beyond Linux ELF to the #1 commodity-
   cracking target:

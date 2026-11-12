@@ -33,10 +33,15 @@ import subprocess
 REPO = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 AUDIT_DIR = os.path.join(REPO, "harness", "audit")
 AUDIT = os.path.join(AUDIT_DIR, "elf_exposure_audit.py")
-TRANSFORM = os.path.join(REPO, "harness", "harden", "carapace_identity_transform.py")
+HARDEN_DIR = os.path.join(REPO, "harness", "harden")
+TRANSFORM = os.path.join(HARDEN_DIR, "carapace_identity_transform.py")
+EXHAUST = os.path.join(HARDEN_DIR, "carapace_exhaust.py")
+HONEY = os.path.join(HARDEN_DIR, "carapace_honeytokens.py")
+MACHO_STRIP = os.path.join(HARDEN_DIR, "carapace_macho_strip.py")
 
 sys.path.insert(0, AUDIT_DIR)
-from elf_exposure_audit import analyze, render  # noqa: E402
+from elf_exposure_audit import analyze, render  # noqa: E402  (ELF: analyze/render)
+import pe_exposure_audit as pe_audit            # noqa: E402  (PE: analyze/render/recommend)
 
 
 def _rel(p):
@@ -44,6 +49,46 @@ def _rel(p):
         return os.path.relpath(p, REPO)
     except ValueError:
         return p
+
+
+# ---- format dispatch (route by magic byte) --------------------------------
+_MACHO_MAGICS = {
+    b"\xfe\xed\xfa\xce", b"\xce\xfa\xed\xfe",   # 32-bit (BE/LE)
+    b"\xfe\xed\xfa\xcf", b"\xcf\xfa\xed\xfe",   # 64-bit (BE/LE)
+    b"\xca\xfe\xba\xbe", b"\xbe\xba\xfe\xca",   # fat / universal
+}
+
+
+def _detect_format(path):
+    """ELF / PE / Mach-O by magic, so one `audit`/`report` front door covers all."""
+    with open(path, "rb") as f:
+        head = f.read(4)
+    if head[:4] == b"\x7fELF":
+        return "elf"
+    if head[:2] == b"MZ":
+        return "pe"
+    if head in _MACHO_MAGICS:
+        return "macho"
+    return "unknown"
+
+
+# Mach-O scanner is wired lazily so the ELF/PE path never pays its import cost
+# and the skill still works if it isn't present yet.
+def _macho_audit():
+    import importlib
+    return importlib.import_module("macho_exposure_audit")
+
+
+_SERVER_TRUTH = (
+    "  The only Strong tier is format-independent: relocate secrets & trust "
+    "decisions\n  server-side — what the client never holds can't be reversed "
+    "(CLAUDE.md §3).")
+
+
+def _nonelf_note(fmt):
+    return (f"  Note: this audit covers {fmt.upper()}. The harness's apply/harden "
+            "countermeasures\n  currently target ELF; for other formats the audit is "
+            "read-only today.\n" + _SERVER_TRUTH)
 
 
 # ---- recommendation policy (ordered, highest value first) ----------------
@@ -147,6 +192,39 @@ def _rules(s, binpath):
                     "covers live, used strings.",
         })
 
+    # 4b. Analysis-surface exhaustion — tax the naive agent's budget. POST-BUILD.
+    if not s.get("exhaustion_present"):
+        out.append({
+            "id": "exhaustion",
+            "title": "Inflate analysis surface: decoy non-alloc sections + synthetic symbols",
+            "kind": "post-build",
+            "weapon": "the naive 'ingest everything' AI-RE agent (context/token/inventory budget)",
+            "tier": "Trivial→Speed-bump (taxes the lazy automated path; not a comprehension blocker)",
+            "bypass": "Restrict analysis to allocated/executable (SHF_ALLOC) sections and to "
+                      "code-referenced symbols — our decoys are never mapped and never called.",
+            "command": f"python3 harness/harden/carapace_exhaust.py {b} {b}.exh "
+                       f"--sections 4 --section-size 131072 --symbols 300",
+            "note": "Post-build; runtime byte-identical, exports untouched (verified). Pairs with the "
+                    "identity transform — exhaust AFTER decoying so the surface stays plausible.",
+        })
+
+    # 4c. Honeytokens / canaries — poison the agent's findings + attribution. POST-BUILD.
+    if not s.get("honeytokens_present"):
+        out.append({
+            "id": "honeytokens",
+            "title": "Plant honeytokens / canaries (plausible decoy secrets + private ledger)",
+            "kind": "post-build",
+            "weapon": "the naive agent's string-mining 'findings' (poison) + leak attribution",
+            "tier": "Speed-bump (poison) / Meaningful FOR DETECTION (attribution — not prevention)",
+            "bypass": "A careful analyst xref-validates a 'secret' and drops one nothing references; "
+                      "the default section name is a tell, so rename/randomise it for production.",
+            "command": f"python3 harness/harden/carapace_honeytokens.py plant {b} {b}.honey "
+                       f"--ledger {b}.honey-ledger.json --count 10 --build-tag <build-id>",
+            "note": "Post-build; runtime byte-identical, exports untouched (verified). Keep the ledger "
+                    "PRIVATE — it attributes a leaked token to the exact build. Detects/attributes a "
+                    "crack; it does not stop one.",
+        })
+
     # 5. Link hardening — raises effort, not a decompile blocker.
     if s["hardening"]["relro"] != "full":
         out.append({
@@ -198,12 +276,43 @@ def _fmt_rec(r):
     return "\n".join(L)
 
 
+def _unknown(path):
+    raise ValueError(f"unrecognized format (not ELF/PE/Mach-O): {_rel(path)}")
+
+
 def cmd_audit(args):
-    print(render(analyze(args.binary)))
+    fmt = _detect_format(args.binary)
+    if fmt == "elf":
+        print(render(analyze(args.binary)))
+    elif fmt == "pe":
+        print(pe_audit.render(pe_audit.analyze(args.binary)))
+    elif fmt == "macho":
+        m = _macho_audit()
+        print(m.render(m.analyze(args.binary)))
+    else:
+        _unknown(args.binary)
     return 0
 
 
 def cmd_recommend(args):
+    fmt = _detect_format(args.binary)
+    if fmt in ("pe", "macho"):
+        if fmt == "pe":
+            s = pe_audit.analyze(args.binary)
+            line = pe_audit.recommend(s)
+        else:
+            m = _macho_audit()
+            s = m.analyze(args.binary)
+            line = m.recommend(s)
+        print(f"Carapace — next hardening for {_rel(args.binary)} [{fmt.upper()}]")
+        print(f"  exposure score {s['score']}/100 — {s['tier']}")
+        print()
+        print(f"  {line}")
+        print()
+        print(_nonelf_note(fmt))
+        return 0
+    if fmt != "elf":
+        _unknown(args.binary)
     s, recs = recommend(args.binary, want_all=args.all)
     if args.json:
         print(json.dumps({"score": s["score"], "tier": s["tier"], "recommendations": recs}, indent=2))
@@ -221,7 +330,20 @@ def cmd_recommend(args):
 
 def cmd_report(args):
     """Full audit + the ordered hardening plan, in one call — the one-shot
-    readout for an operator or for the skill to relay."""
+    readout for an operator or for the skill to relay. ELF gets the full plan;
+    PE/Mach-O get the format's read-only audit + the server-side truth."""
+    fmt = _detect_format(args.binary)
+    if fmt in ("pe", "macho"):
+        if fmt == "pe":
+            print(pe_audit.render(pe_audit.analyze(args.binary)))
+        else:
+            m = _macho_audit()
+            print(m.render(m.analyze(args.binary)))
+        print()
+        print(_nonelf_note(fmt))
+        return 0
+    if fmt != "elf":
+        _unknown(args.binary)
     s = analyze(args.binary)
     print(render(s))
     print()
@@ -237,6 +359,24 @@ def cmd_report(args):
 
 
 def cmd_apply(args):
+    fmt = _detect_format(args.binary)
+    if fmt == "macho":
+        # the one safe Mach-O post-build pass: strip LOCAL symbols (strip -x).
+        out = args.out or (args.binary + ".stripped")
+        r = subprocess.run(["python3", MACHO_STRIP, "--in", args.binary, "--out", out],
+                           capture_output=True, text=True)
+        sys.stdout.write(r.stdout)
+        if r.returncode != 0:
+            sys.stderr.write(r.stderr)
+            return r.returncode
+        print(f"  applied -> {_rel(out)}   (Mach-O local-symbol strip)")
+        print("  re-audit with `carapace audit`; runtime-identical needs a macOS host to confirm.")
+        return 0
+    if fmt != "elf":
+        print(f"carapace: apply targets ELF; {_rel(args.binary)} is {fmt.upper()}.")
+        print("  The post-build transforms (identity/exhaust/honeytokens) are ELF-only today;")
+        print("  run `carapace audit` for the read-only posture, and keep secrets server-side.")
+        return 3
     s, recs = recommend(args.binary, want_all=False)
     top = recs[0]
     print(f"Top recommendation: {top['title']}  [{top['kind']}]")
@@ -259,6 +399,138 @@ def cmd_apply(args):
         return r.returncode
     print(f"  applied -> {_rel(out)}   (private map: {_rel(mp)})")
     print("  re-audit the result with `carapace recommend` to see the next step.")
+    return 0
+
+
+def cmd_harden(args):
+    """One command: audit, then apply EVERY applicable POST-BUILD hardening in a
+    safe order, and honestly list the build-time ones that still need a rebuild.
+    The UX-parity entry point (cf. a one-command `harden .`), but it never fakes a
+    build-time guard onto an already-built binary."""
+    import tempfile
+    import shutil as _sh
+    binary = args.binary
+    fmt = _detect_format(binary)
+    if fmt != "elf":
+        print(f"carapace: harden targets ELF; {_rel(binary)} is {fmt.upper()}.")
+        print("  The post-build passes (identity/exhaust/honeytokens) are ELF-only today;")
+        print("  run `carapace audit` for the read-only posture, and keep secrets server-side.")
+        return 3
+    out = args.out or (binary + ".hardened")
+    s = analyze(binary)
+
+    tmpd = tempfile.mkdtemp(prefix="carapace_harden_")
+    cur = os.path.join(tmpd, "stage0")
+    _sh.copy2(binary, cur)
+    stage = 0
+
+    def _next():
+        nonlocal stage
+        stage += 1
+        return os.path.join(tmpd, f"stage{stage}")
+
+    def _run_pass(cmd):
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0:
+            sys.stderr.write(r.stderr or r.stdout)
+            raise RuntimeError("hardening pass failed")
+        return r.stdout
+
+    applied = []   # (title, tier, bypass, artifact-note)
+    try:
+        # order matters: identity FIRST (it renames/strips OWN symbols), THEN the
+        # additive passes (exhaust / honeytokens) so they aren't touched by it.
+        if s["symbols_present"] or s["debug_info_present"] or s["informativeness"]["symbol_total"] > 0:
+            nf = _next()
+            mp = out + ".carapace-map.json"
+            _run_pass(["python3", TRANSFORM, "transform", "--mode", "D",
+                       "--in", cur, "--out", nf, "--map", mp])
+            cur = nf
+            applied.append(("identity transform (decoy symbols)",
+                            "Speed-bump→Meaningful",
+                            "behavioural xref/value-flow ignores names",
+                            f"PRIVATE map → {_rel(mp)}"))
+
+        if not analyze(cur).get("exhaustion_present"):
+            nf = _next()
+            _run_pass(["python3", EXHAUST, cur, nf,
+                       "--sections", "4", "--section-size", "131072", "--symbols", "300"])
+            cur = nf
+            applied.append(("analysis-surface exhaustion",
+                            "Trivial→Speed-bump",
+                            "filter to SHF_ALLOC sections + code-referenced symbols",
+                            "decoy non-alloc sections + synthetic symbols"))
+
+        if not analyze(cur).get("honeytokens_present"):
+            nf = _next()
+            ledger = out + ".honey-ledger.json"
+            _run_pass(["python3", HONEY, "plant", cur, nf,
+                       "--ledger", ledger, "--count", "10", "--build-tag", args.build_tag])
+            cur = nf
+            applied.append(("honeytokens / canaries",
+                            "Speed-bump (poison) / Meaningful for DETECTION",
+                            "xref-validate drops unreferenced tokens; rename the tell-tale section",
+                            f"PRIVATE ledger → {_rel(ledger)}"))
+
+        _sh.copy2(cur, out)
+    except RuntimeError:
+        _sh.rmtree(tmpd, ignore_errors=True)
+        return 1
+    finally:
+        _sh.rmtree(tmpd, ignore_errors=True)
+
+    # what we did NOT do: the build-time guards (rebuild needed) + the Strong truth.
+    _, recs = recommend(out, want_all=True)
+    deferred = [r for r in recs if r["kind"] == "build-time"]
+    design = [r for r in recs if r["kind"] == "design"]
+
+    print(f"Carapace harden — {_rel(binary)} → {_rel(out)}")
+    print(f"  exposure score {s['score']}/100 → (re-audit {_rel(out)} to see the new posture)")
+    print()
+    print(f"  APPLIED (post-build, {len(applied)}):")
+    for t, tier, byp, art in applied:
+        print(f"    ✓ {t}")
+        print(f"        tier   : {tier}")
+        print(f"        bypass : {byp}")
+        print(f"        artifact: {art}")
+    if not applied:
+        print("    (nothing post-build applied — already hardened, or no symbols)")
+    print()
+    print(f"  NOT APPLIED — build-time, needs a rebuild from source ({len(deferred)}):")
+    for r in deferred:
+        print(f"    • {r['title']}  [{r['tier']}]")
+        print(f"        how: {r['command']}")
+    print()
+    if design:
+        d = design[0]
+        print(f"  THE ONLY STRONG TIER: {d['title']}")
+        print(f"        {d['tier']}")
+    print()
+    print("  Keep every PRIVATE map/ledger OUT of the shipped artifact — they are the keys.")
+    print("  Honest footer: nothing here is unbreakable — anti-RE only raises the attacker's")
+    print("  cost. Post-build passes are COST/DETECTION; the build-time guards and the")
+    print("  server-side relocation above are where real strength lives.")
+    return 0
+
+
+def cmd_install(args):
+    """Install the skill by symlinking skill/ into a .claude/skills/carapace dir —
+    the one-command 'make it available to Claude' step (install parity)."""
+    skill_dir = os.path.join(REPO, "skill")
+    base = args.dir or os.path.join(os.path.expanduser("~") if args.user else os.getcwd(),
+                                     ".claude", "skills")
+    target = os.path.join(base, "carapace")
+    os.makedirs(base, exist_ok=True)
+    if os.path.islink(target):
+        os.unlink(target)
+    elif os.path.exists(target):
+        print(f"carapace error: {target} exists and is not a symlink — remove it first",
+              file=sys.stderr)
+        return 2
+    os.symlink(skill_dir, target)
+    print(f"carapace skill installed: {target} -> {skill_dir}")
+    print("  Claude Code will discover it as the 'carapace' skill. Verify with: "
+          "ls -l " + target)
     return 0
 
 
@@ -290,10 +562,21 @@ def main(argv=None):
     p.add_argument("--string-decoys")
     p.set_defaults(fn=cmd_apply)
 
+    h = sub.add_parser("harden", help="one command: apply every applicable post-build hardening")
+    h.add_argument("binary")
+    h.add_argument("--out", help="output path (default <binary>.hardened)")
+    h.add_argument("--build-tag", default="dev-build", help="build id recorded in the honeytoken ledger")
+    h.set_defaults(fn=cmd_harden)
+
+    i = sub.add_parser("install", help="symlink the skill into .claude/skills/carapace")
+    i.add_argument("--user", action="store_true", help="install into ~/.claude/skills instead of ./")
+    i.add_argument("--dir", help="explicit .claude/skills base dir (overrides --user)")
+    i.set_defaults(fn=cmd_install)
+
     args = ap.parse_args(argv)
     try:
         return args.fn(args)
-    except (FileNotFoundError, IsADirectoryError) as e:
+    except (FileNotFoundError, IsADirectoryError, ValueError, pe_audit.PEError) as e:
         print(f"carapace error: {e}", file=sys.stderr)
         return 2
 

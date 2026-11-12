@@ -8,7 +8,7 @@
 
 BIN ?= harness/sample/sample_dev
 
-.PHONY: demo verify audit report clean help
+.PHONY: demo verify audit audit-pe audit-macho report harden harden-macho install-skill clean help
 .DEFAULT_GOAL := help
 
 demo:
@@ -29,9 +29,22 @@ audit:
 audit-pe:
 	@python3 harness/audit/pe_exposure_audit.py "$(BIN)"
 
+audit-macho:
+	@python3 harness/audit/macho_exposure_audit.py "$(BIN)"
+
 report:
 	@$(MAKE) -s -C harness/sample sample_dev
 	@python3 skill/carapace.py report "$(BIN)"
+
+harden:
+	@$(MAKE) -s -C harness/sample sample_dev
+	@python3 skill/carapace.py harden "$(BIN)"
+
+harden-macho:
+	@python3 harness/harden/carapace_macho_strip.py --in "$(BIN)" --out "$(BIN).stripped"
+
+install-skill:
+	@python3 skill/carapace.py install
 
 clean:
 	@$(MAKE) -s -C harness/sample clean
@@ -45,7 +58,11 @@ help:
 	@echo "  make verify   run every verify slice and print one posture summary"
 	@echo "  make audit    BIN=<elf>   scored exposure report for your own binary"
 	@echo "  make audit-pe BIN=<exe>   scored exposure report for a Windows PE"
+	@echo "  make audit-macho BIN=<o> scored exposure report for a Mach-O (macOS/iOS)"
 	@echo "  make report   BIN=<elf>   full audit + the ordered hardening plan"
+	@echo "  make harden   BIN=<elf>   one command: apply every post-build hardening (honest)"
+	@echo "  make harden-macho BIN=<o> strip LOCAL symbols from a Mach-O (strip -x equivalent)"
+	@echo "  make install-skill        symlink the skill into .claude/skills/carapace"
 	@echo "  make clean    remove build artifacts"
 	@echo
 	@echo "Blue team only: audit/harden software you own or are authorized to protect."

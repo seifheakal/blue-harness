@@ -14,11 +14,20 @@ Everything runs through one deterministic driver — call it, don't improvise:
 
 ```
 python3 skill/carapace.py audit      <binary>              # full exposure report
+python3 skill/carapace.py report     <binary>              # audit + ordered plan, one shot
 python3 skill/carapace.py recommend  <binary> [--all]      # next highest-value hardening
-python3 skill/carapace.py apply      <binary> [--mode S|M|D]# apply a post-build hardening
+python3 skill/carapace.py apply      <binary> [--mode S|M|D]# apply ONE post-build hardening
+python3 skill/carapace.py harden     <binary>              # apply ALL post-build passes, one command
+python3 skill/carapace.py install    [--user|--dir DIR]    # symlink the skill into .claude/skills
 ```
 
 ## The loop (audit-first — never skip the audit)
+
+   The front door **auto-detects the format by magic byte**: `audit`/`report`/
+   `recommend` route a **Linux ELF**, a **Windows PE**, or a **macOS/iOS Mach-O**
+   to the right scanner (an unrecognized file errors cleanly). The post-build
+   `apply`/`harden` transforms are ELF-only and will **refuse** a non-ELF rather
+   than mangle it.
 
 1. **Audit.** Run `carapace audit <binary>`. It reports the exposure score, the
    posture tier, the signals an AI-assisted RE agent (e.g. `rea`) reads for free
@@ -33,18 +42,20 @@ python3 skill/carapace.py apply      <binary> [--mode S|M|D]# apply a post-build
    soften them, and never say or imply "unbreakable."
 
 3. **Apply — but mind the kind:**
-   - **post-build** (the dev↔release identity transform): safe to apply to the
-     shipped binary now. `carapace apply <binary> --mode D` (D = plausible decoys,
-     M = reversible opaque map, S = strip). It writes `<binary>.release` and a
-     **private mapping file** — tell the operator to keep that mapping **out of
-     the shipped artifact** (it's the key that recovers real names for crash
-     triage).
-   - **build-time** (core-dump / anti-ptrace guards): these require a **rebuild**.
-     Do **not** claim to patch them into an existing binary. Point the operator at
-     `harness/harden/README.md` for the one-line integration (link
-     `carapace_guards.c`, call the guard at startup), then re-audit.
-   - **roadmap** (e.g. live-string encryption): state plainly that it is not yet
-     implemented here — don't pretend it is.
+   - **post-build** (identity transform, analysis-surface exhaustion, honeytokens):
+     safe to apply to the shipped binary now. Apply one with `carapace apply`, or
+     **all of them in one command** with `carapace harden <binary>` — it chains the
+     identity decoy → exhaust → honeytoken passes, writes `<binary>.hardened` plus
+     the **private** map/ledger files, and then honestly lists the build-time
+     guards it did **not** apply. Tell the operator to keep every private map/ledger
+     **out of the shipped artifact** — they are the keys (crash-triage name
+     recovery; leaked-token attribution).
+   - **build-time** (core-dump / anti-ptrace / anti-Frida / integrity-attestation /
+     string encryption): these require a **rebuild**. Do **not** claim to patch them
+     into an existing binary. Point the operator at `harness/harden/README.md` for
+     the one-line integration, then re-audit.
+   - Everything the harness can do is implemented; there is no "coming soon" step to
+     imply. If a hardening isn't in the plan the audit prints, it isn't offered.
 
 4. **Re-audit** after any change to confirm the posture moved and to get the next
    step. The score should drop; if it doesn't, say so.
@@ -69,5 +80,6 @@ tier and bypass), the exact command, and — when relevant — the server-side-t
 caveat. Detail lives in the harness READMEs and `docs/re-techniques/rea.md`; point
 there rather than pasting walls of text.
 
-> Install: this skill lives in the repo at `skill/`. To load it as a Claude Code
-> skill, copy or symlink this directory under `.claude/skills/carapace/`.
+> Install: this skill lives in the repo at `skill/`. Load it as a Claude Code skill
+> with `python3 skill/carapace.py install` (or `make install-skill`), which
+> symlinks it under `.claude/skills/carapace/`; `--user` targets `~/.claude/skills`.

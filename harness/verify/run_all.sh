@@ -16,8 +16,16 @@ declare -A WHAT=(
     [e]="the report one-shot renders the full audit + ordered plan, no overclaiming"
     [f]="build-time string encryption: plaintext gone from static view, correct at runtime"
     [g]="PE/Windows exposure audit: DllCharacteristics, imports, PDB, Authenticode (read-only)"
+    [h]="CI wiring enforces 'make verify' on every push/PR (config lint; no new countermeasure)"
+    [i]="analysis-surface exhaustion: inventory ballooned, runtime byte-identical, exports intact"
+    [j]="honeytokens/canaries: plausible decoy secrets poison + attribute, provably inert"
+    [k]="empirical CrackMe + honest scorer plumbing (effectiveness run is operator-VM-gated)"
+    [l]="one-command 'carapace harden' applies every post-build pass; honest skill install"
+    [m]="skill routes audit/report by magic byte (ELF/PE); apply/harden refuse non-ELF honestly"
+    [n]="Mach-O exposure audit (third format): symtab/cstring/dylibs, soft→hard flip, fat parsed"
+    [o]="Mach-O local-symbol strip (first Mach-O harden): locals gone, externals kept, surgical"
 )
-ORDER="a b c d e f g"
+ORDER="a b c d e f g h i j k l m n o"
 
 echo "=================================================================="
 echo "  Carapace — measure it, harden it, PROVE it"
