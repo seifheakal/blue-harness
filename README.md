@@ -12,194 +12,157 @@
 
 ---
 
-> [!NOTE]
-> **About the measured numbers in this README.** The empirical before/after
-> (baseline vs. hardened) was run on a **single laptop — an NVIDIA RTX 3070 Laptop
-> GPU (8 GB VRAM) with 16 GB RAM** — so the attacker was a small, 4-bit-quantised
-> **7-billion-parameter** model (`qwen2.5-coder:7b`), about the largest that fits
-> on that hardware, **not a frontier model**. Read the result as an **illustrative
-> floor from a constrained local attacker (N=1)**, not a ceiling: more VRAM, a
-> larger local model, or a hosted frontier model would push harder. Full
-> methodology and caveats:
-> [`research/findings/2026-11-11-slice-k-empirical-run.md`](research/findings/2026-11-11-slice-k-empirical-run.md).
+> [!CAUTION]
+> ### 🔴 Help wanted — test Carapace against a bigger model
+> Our before/after below is **one run (N=1)** by a small, 4-bit-quantised **7B**
+> model on a laptop (RTX 3070, 8 GB VRAM / 16 GB RAM) — a **floor, not a ceiling**.
+> If you have the hardware, point a **larger local or a frontier model** at the same
+> two builds and **send the scored result back as a PR**. A stronger attacker is the
+> only way to test the layers our small run never reached. Five-minute guide:
+> [**docs/HOW-WE-TESTED.md**](docs/HOW-WE-TESTED.md).
 
-## Quickstart (see it in ~30 seconds)
+## Quickstart
 
 ```bash
 git clone https://github.com/seifheakal/blue_team && cd blue_team
 make demo      # audit a sample build, show its hardening plan, then PROVE every defense fires
-make verify    # run every verify slice and print one posture summary
+make verify    # run every check and print one posture summary
 ```
 
 Point it at your **own** binary:
 
 ```bash
-make report BIN=path/to/your/elf     # full exposure audit + the ordered hardening plan
-make harden BIN=path/to/your/elf     # one command: apply every post-build hardening (honest about the rest)
-make install-skill                   # load the Claude skill (symlink into .claude/skills/carapace)
+make report BIN=path/to/your/binary   # exposure audit + the ordered hardening plan
+make harden BIN=path/to/your/binary   # apply every post-build hardening (honest about the rest)
 ```
 
-No external dependencies: a C toolchain, `make`, and Python 3 (the audit is a
-self-contained ELF parser; the integrity guard ships its own SHA-256/HMAC).
+No external dependencies: a C toolchain, `make`, and Python 3.
 
-## What this is
+## What it is
 
-Reverse engineering used to take real skill — Ghidra, IDA, Frida, years of
-practice. Not anymore. Today anyone can install an AI skill or MCP server, point
-an LLM agent at a binary or an app, type **one sentence**, and get back readable
-code, a patch, or a working hook. The skill floor collapsed, and commodity
-cracking of shipped software — games, creative suites, office apps — exploded
-with it.
+Reverse engineering used to take real skill. Now anyone can point an AI agent at a
+binary, type one sentence, and get back readable code or a working patch — and
+commodity cracking of shipped software exploded with it.
 
-**Carapace** is a *defensive* toolkit aimed squarely at that new threat. It runs
-against **your own build** and does three things, audit-first:
+Carapace is a **defensive** toolkit aimed at that threat. It runs against **your own
+build** and does three things, audit-first:
 
-- **Audit** — scan a build and score how exposed it is (symbols/strings an agent
-  reads for free, entropy, hardening flags, which self-defense guards are present).
-- **Harden** — apply tested countermeasures and raise the attacker's cost.
-- **Prove** — verify each countermeasure actually *fires*, so your "protection"
-  isn't theater.
+- **Audit** — scan a build and score how exposed it is (symbols, strings, entropy,
+  hardening flags, which self-defense guards are present).
+- **Harden** — apply tested countermeasures to raise the attacker's cost.
+- **Prove** — verify each countermeasure actually *fires*, so your protection isn't
+  theater.
 
-## What's built so far
+## The measured result (one run — see the red box)
 
-Fourteen implementation slices, each **audit → harden → verify**, plus a CI gate
-that runs them all on every push and pull request — every check green
-(`make verify` → 223/223). The **nine countermeasures** below are each rated on
-an honest tier and ship with a **named bypass** — nothing here claims to be
-unbreakable. One command applies every post-build pass (`make harden BIN=…`); the
-audit **auto-detects the format by magic byte** and reads **Linux ELF**, **Windows
-PE** and **macOS/iOS Mach-O** (`carapace audit <bin>` routes any of the three).
+| build | cracked (hash-verified) | tokens | wall | steps |
+|-------|-------------------------|--------|------|-------|
+| unprotected | **YES** | 1,256 | 1.6 s | 3 |
+| hardened | **no** | 16,785 | 195 s | 13 |
 
-| Countermeasure | Denies (the `rea` AI-RE agent) | Tier | Named bypass |
+The same agent cracked the unprotected build in under two seconds; against the
+hardened build it burned **13× the tokens and ~120× the wall-clock and still
+failed**. String encryption, anti-debug, and analysis-surface exhaustion were all
+seen firing. Honestly: the **honeytoken layer never fired** — the agent was stopped
+earlier, so that layer went untested (exactly what a bigger model would exercise).
+Method and caveats: [docs/HOW-WE-TESTED.md](docs/HOW-WE-TESTED.md) ·
+[full write-up](research/findings/2026-11-11-slice-k-empirical-run.md).
+
+## What it hardens
+
+Nine countermeasures, each **proven to fire by a test** and each carrying an honest
+strength tier and a **named bypass** — nothing here claims to be unbreakable.
+
+| Countermeasure | Blunts | Tier | Named bypass |
 |---|---|---|---|
-| **Core-dump suppression** | Cluster E — crash-core memory reads | Speed-bump | Attacker re-enables cores on their host; reads live memory via Frida/GDB |
-| **Anti-ptrace / anti-debug** | Cluster G/H — Frida attach + GDB | Meaningful | Frida hooks the check; spawn-paused loads a bypass first |
-| **Dev↔release identity transform** (strip / map / **decoy**) | Cluster B/C + the AI layer — names/strings the agent reasons from | Speed-bump→Meaningful | Behavioral cross-check (xrefs/value-flow) ignores names |
-| **String encryption** (decode-on-demand loader) | Cluster B/C — `list_strings` on live strings | Speed-bump→Meaningful | Embedded key → recover at rest; lift decoded string from memory |
-| **Anti-Frida detector** (maps / thread / port) | Cluster G — Frida inject | Meaningful | Stealth modes, renamed gadget, non-default port |
-| **Code-integrity + server-nonce attestation** | Cluster G — patch a hot function | Meaningful→**Strong** (server-tied) | Sustained live hook; client key is extractable (trust rests on the server nonce) |
-| **Analysis-surface exhaustion** (decoy non-alloc sections + synthetic symbols) | the naive "ingest everything" agent — context/token/inventory budget | Trivial→Speed-bump | Filter to `SHF_ALLOC` sections + code-referenced symbols (decoys are never mapped/called) |
-| **Honeytokens / canaries** (plausible decoy secrets + private attribution ledger) | the agent's string-mined "findings" (poison) + crack **attribution** | Speed-bump (poison) / Meaningful (detection) | Xref-validate to drop unreferenced tokens; rename the tell-tale section — detects/attributes, doesn't prevent |
-| **Mach-O local-symbol strip** (`strip -x` equivalent, no toolchain) | internal/static names an agent mines from a macOS/iOS Mach-O | Speed-bump→Meaningful | Exported names remain (dyld needs them); behavior is recoverable. Runtime-identical is proven on a macOS host, not here |
+| Anti-debug / anti-ptrace | live debugging & tracing (GDB, Frida attach) | Meaningful | Frida hooks the check; spawn-paused bypass loads first |
+| String encryption (decode-on-demand) | reading secrets straight from the bytes | Speed-bump→Meaningful | embedded key → recover at rest; lift from memory |
+| Dev→release identity transform (strip / rename / decoy) | names & symbols an agent reasons from | Speed-bump→Meaningful | behavioural cross-check ignores names |
+| Anti-Frida detector | Frida injection (maps / threads / port) | Meaningful | stealth mode, renamed gadget, non-default port |
+| Code-integrity + server attestation | patching a hot function | Meaningful→**Strong** (server-tied) | sustained live hook; client key is extractable |
+| Core-dump suppression | crash-core memory reads | Speed-bump | re-enable cores on their host; read live memory |
+| Analysis-surface exhaustion | the "ingest everything" agent's budget | Trivial→Speed-bump | filter to real sections + referenced symbols |
+| Honeytokens / canaries | poisons string-mined "findings" + attributes a leak | Speed-bump / Meaningful (detection) | xref-validate drops decoys; rename the tell-tale section |
+| Mach-O local-symbol strip | internal names in a macOS/iOS binary | Speed-bump→Meaningful | exported names remain; runtime-identical proven on macOS only |
 
-Driven by a scored [audit scanner](harness/audit/) and a [Claude skill](skill/)
-(`carapace audit | report | recommend | apply | harden | install`) that reads the
-posture and tells you the next highest-value hardening — with its tier and bypass,
-every time — or applies every post-build pass in one `harden` command.
+A [Claude skill](skill/) reads the posture and tells you the next highest-value
+hardening — with its tier and bypass, every time.
 
-To put honest *numbers* on it, Carapace also ships a digest-sealed
-[CrackMe](harness/crackme/) and an [empirical scorer](harness/measure/): run a real
-AI-RE agent against the baseline vs. the hardened build on your own sandboxed VM,
-and get a measured before/after (a "crack" counts only if it hashes to the sealed
-flag; missing figures read *not measured*, never estimated). See the
-[runbook](docs/workflow/slice-k-empirical-runbook.md).
+## What's done, what isn't, what's next
 
-**First measured run (baseline vs. hardened, on the laptop in the note above).**
-The agent cracked the unprotected baseline in 3 steps / ~1.6 s (hash-verified
-against the seal). Against the hardened build it burned **13.4× the tokens and
-~122× the wall-clock and still failed** — it ran out of productive moves and
-returned a wrong flag, correctly scored *not cracked*. **String encryption**,
-**anti-debug guards** and **analysis-surface exhaustion** were all observed
-firing. Honest footnote worth stating plainly: the **honeytoken / canary layer
-(Slice J) — the decoy secrets that poison an agent's string-mined findings and the
-private ledger that attributes a leaked crack — never fired.** The agent was
-stopped upstream by the three defenses above before it could reach, and be fooled
-into reporting, a decoy, so Slice J's poison-and-attribution effect went
-unexercised in this run. It resisted here via encryption + anti-debug + exhaustion,
-not via the poison layer.
+**Working today**
+- Read-only exposure audit + score for **all three native formats** — Linux ELF,
+  Windows PE, macOS/iOS Mach-O — auto-detected by magic byte.
+- The **nine countermeasures above** on Linux ELF (build-time + post-build), plus a
+  first macOS/iOS pass (local-symbol strip).
+- One-command `harden`, the driving Claude skill, and a **CI gate that re-proves
+  every defense fires on each push** (223 checks green).
+- An empirical harness (digest-sealed CrackMe + honest scorer) and **one measured
+  before/after run**.
 
-**How we tested, and a call to arms.** Both testing layers — the `make verify`
-mechanism proofs and this empirical run — are documented in
-[**How we tested**](docs/HOW-WE-TESTED.md), with a step-by-step guide to
-re-running the measurement. It would be genuinely valuable if someone ran it
-against a **bigger model** (more VRAM, or a hosted frontier model): a stronger
-attacker would finally exercise Slice J, which ours never reached. Scored,
-hash-verified runs are very welcome by PR.
+**Not done yet**
+- Full hardening for **Windows PE** (today it is audit-only) and **deeper macOS/iOS**
+  (one pass so far; runtime checks need a Mac to verify).
+- **Mobile app reach** — Android native libraries via JNI, iOS app internals.
+- **More measurement** — the before/after is a single run from a small local model
+  (the red box at the top).
 
-Details and the attacker-weapon mapping: [`docs/re-techniques/rea.md`](docs/re-techniques/rea.md).
+**Next, in order**
+1. More measurement against **bigger / reliably tool-calling attackers** — the
+   community ask at the top.
+2. A **Windows PE hardening** path (beyond audit).
+3. **Deeper macOS/iOS hardening** (decoys / exhaustion / honeytokens), verified on a
+   Mac.
+4. **Mobile** (Android / iOS) reach.
 
-## What it is / what it isn't
+*Deliberately out of scope:* a web/bundle track (Electron / JS / Wasm / .NET). It
+would only be added later as a separate, clearly-labelled track — never silently,
+never at the cost of the "prove it" guarantee.
 
-- ✅ A way to **measure** your build's RE exposure and **prove** your hardening
-  actually fires, with honest strength tiers.
-- ✅ Focused on the **AI-assisted, one-command** RE threat (P0), not just the
-  classic tools those agents drive.
+## How Carapace compares
+
+Carapace isn't the only tool defending against AI-assisted RE — a good sign the
+threat is real. The difference is **depth on native binaries and proof instead of
+assertion**. (Peer descriptions below are from their own READMEs; we ran none of
+them.)
+
+| | **Carapace** | BLA (~2.3k★) | antirea (~36★) | AREA (~3★) |
+|---|---|---|---|---|
+| **Focus** | native binaries + mobile (ELF / PE / Mach-O) | breadth: JS / Electron / Wasm / .NET bundles | agent instruction-file barriers | obfuscation toolbox |
+| **Native-binary defenses** | **proven to fire by tests** | README: Ghidra / Frida / LLDB "not run" | — | "designed-for", no measured results |
+| **Evidence of protection** | mechanism tests **+ a measured before/after** | internal estimates + a drift-check | self-limited ("no guarantee") | "deterrence, not proof" |
+| **Honesty** | tier + **named bypass on every defense** | status labels; estimate multipliers | states its own limits | "a determined human gets through" |
+
+Carapace has already absorbed the peers' best native-applicable ideas (surface
+exhaustion, honeytoken poisoning) as its own, mechanism-proven countermeasures. See
+[the competitive scan](research/findings/2026-11-05-competitive-landscape.md).
+
+## What it isn't
+
 - ❌ **Not** a magic "uncrackable" wrapper. Anti-RE raises cost; a determined,
   skilled attacker on hardware they control still wins. The harness says so.
-- ❌ **Not** a secrets vault. If a secret truly can't afford to leak, Carapace's
-  first recommendation is the honest one: **move it server-side** — the only
-  *Strong* tier.
-- ❌ **Not** an offensive tool. Blue team only — it audits/hardens software the
-  operator owns or is authorized to protect. See [`docs/threat-model.md`](docs/threat-model.md).
-
-## Scope
-
-| Track | Targets | Top threats we defend against |
-|-------|---------|-------------------------------|
-| **A — Native binaries** | ELF / PE / Mach-O (C / C++ / Rust / Go) | Frida, Ghidra/IDA, GDB/LLDB/x64dbg, Cheat Engine |
-| **B — Mobile** | Android (APK/AAB, Dalvik + JNI `.so`), iOS (Mach-O) | Frida/objection, JADX/APKTool, Magisk/Xposed, SSL-pinning bypass, iOS decrypt |
-
-**Priority 0 across both tracks:** the AI-assisted tooling that drives those
-engines from a single prompt — disassembler MCP servers, autonomous RE agents,
-LLM decompilers, AI Frida-hook generators. That's the headline threat; the
-classic tools are the substrate it rides on. The implemented countermeasures
-currently target **native ELF on Linux**; the read-only exposure audit covers all
-three native formats — **ELF, Windows PE (Slice G) and macOS/iOS Mach-O (Slice
-N)** — auto-detected by magic byte. The catalog and design cover the rest. See
-[`docs/re-techniques/_index.md`](docs/re-techniques/_index.md). Electron / web /
-JS / WebAssembly / pure-.NET are out of current scope.
-
-## Why it's honest
-
-Anti-RE raises cost; it never makes software unbreakable. Every countermeasure
-ships with a **strength tier** (*Trivial → Speed-bump → Meaningful → Strong*) and
-a **known bypass**. The harness refuses to overclaim — `make verify` proves the
-defenses *fire*, not that they can't be defeated.
-
-## How it's built
-
-Research-first pipeline — **Research → Deep Analysis → Implementation →
-Testing** — with a multi-agent workflow documented in [`CLAUDE.md`](CLAUDE.md).
-We study how real RE tools work, decompose each into steps, and map a defense to
-each step.
+- ❌ **Not** a secrets vault. If a secret truly can't afford to leak, the first
+  honest recommendation is to **move it server-side** — the only *Strong* tier.
+- ❌ **Not** an offensive tool. Blue team only — it audits and hardens software the
+  operator owns or is authorized to protect. See [docs/threat-model.md](docs/threat-model.md).
 
 ## Repo map
 
-- [`harness/audit/`](harness/audit/) — the scored ELF exposure scanner (read-only)
+- [`harness/audit/`](harness/audit/) — the scored exposure scanners (read-only)
 - [`harness/harden/`](harness/harden/) — the countermeasures (+ tiers & bypasses)
-- [`harness/verify/`](harness/verify/) — the tests that prove each one fires (`run_all.sh`)
+- [`harness/verify/`](harness/verify/) — the tests that prove each one fires
 - [`skill/`](skill/) — the Claude skill that drives it all
-- [`docs/`](docs/) — threat model, the RE catalog, and the worked countermeasure analysis
 - [`docs/HOW-WE-TESTED.md`](docs/HOW-WE-TESTED.md) — the two testing layers + how to re-run the measurement (bigger models welcome)
+- [`docs/`](docs/) — threat model and the RE-technique catalog
 - [`CLAUDE.md`](CLAUDE.md) — project constitution, scope & workflow
-
-## How we compare
-
-Carapace isn't alone in defending against AI-assisted RE — and that's a good
-sign the threat is real. The difference is **depth and proof**. Peer tools cover
-many bundle formats (Electron / JS / Wasm / .NET) but on **native binaries** tend
-to be *designed-for* rather than *verified*, and their "verify" is often a drift
-check, not evidence a defense fired. Carapace is the opposite trade:
-
-- **Mechanism-proven, not asserted** — every countermeasure ships a test that
-  proves it *fires* (real `PTRACE_ATTACH` refusal, suppressed core, a server that
-  *rejects* a patched function, plaintext strings gone from the bytes), not a
-  before/after size diff.
-- **A named bypass + honest tier on every single defense** — no "internal
-  estimate" multipliers, no implied uncrackability.
-- **Native/mobile depth first** — ELF today (PE audit too), with the broader
-  ecosystem's best ideas (e.g. analysis-surface *exhaustion*) folded into our own
-  slices rather than bolted on. See
-  [`research/findings/2026-11-05-competitive-landscape.md`](research/findings/2026-11-05-competitive-landscape.md).
 
 ## Status
 
-**Active — fourteen verified slices (ELF + PE + Mach-O audit with magic-byte
-dispatch, nine countermeasures incl. a Mach-O local-symbol strip, the driving
-skill with a one-command `harden`, a digest-sealed CrackMe + honest empirical
-scorer) plus a CI gate, 223/223 checks green and enforced in CI**
-([`make verify`](.github/workflows/verify.yml) runs on every push and pull
-request — the badge above is that gate). Roadmap in [`docs/STATE.md`](docs/STATE.md).
+**Active.** All three native formats audited with magic-byte dispatch; nine
+mechanism-proven countermeasures; a one-command `harden`; a CI gate with **223/223
+checks green** ([`make verify`](.github/workflows/verify.yml) on every push and pull
+request — the badge above is that gate); and a digest-sealed CrackMe with an honest
+empirical scorer. Roadmap in [docs/STATE.md](docs/STATE.md).
 
 ## License
 
