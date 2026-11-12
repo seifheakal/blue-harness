@@ -21,11 +21,12 @@ declare -A WHAT=(
     [j]="honeytokens/canaries: plausible decoy secrets poison + attribute, provably inert"
     [k]="empirical CrackMe + honest scorer plumbing (effectiveness run is operator-VM-gated)"
     [l]="one-command 'carapace harden' applies every post-build pass; honest skill install"
-    [m]="skill routes audit/report by magic byte (ELF/PE); apply/harden refuse non-ELF honestly"
+    [m]="skill routes audit/report by magic byte (ELF/PE); apply/harden dispatch PE, refuse unknown"
     [n]="Mach-O exposure audit (third format): symtab/cstring/dylibs, soft→hard flip, fat parsed"
     [o]="Mach-O local-symbol strip (first Mach-O harden): locals gone, externals kept, surgical"
+    [p]="PE harden path: COFF/debug strip + decoy non-mapped overlay + honeytokens, surgical"
 )
-ORDER="a b c d e f g h i j k l m n o"
+ORDER="a b c d e f g h i j k l m n o p"
 
 echo "=================================================================="
 echo "  Carapace — measure it, harden it, PROVE it"
