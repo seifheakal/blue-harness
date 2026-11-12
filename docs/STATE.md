@@ -11,6 +11,16 @@
   **absorb their good ideas into Carapace** ("engulf"), keeping our native-depth +
   mechanism-proof edge. Absorb ideas, not their MIT code (clean-room).
 - Worked specimen: **`rea`** (morluto/rea, npm `rea-agents`) — the P0 reference.
+- **2026-11-12 — PR #3 merged to `main`** (merge `d10d0cb`, branch deleted). Slice P
+  (the Windows **PE harden path**: COFF/debug-PDB strip, decoy non-mapped overlay,
+  overlay honeytokens) landed, so **all three native formats now have a post-build
+  harden path**. CI green at **265/265 across 16 slices**. **Recommended next step:
+  Slice Q — bring Mach-O to post-build parity** (a decoy non-mapped region + overlay
+  honeytokens placed past the last segment's file range, the Mach-O analog of the PE
+  overlay), structurally provable with no macOS host, exactly as Slice P was. Then
+  Mach-O matches PE/ELF (today Mach-O has only the local-symbol strip, Slice O).
+  Alternatives need the operator's go-ahead: a bigger-model Slice K re-run
+  (parked / publicly solicited) or the web/bundle scope expansion (open item 2).
 - **2026-11-12 — PR #1 merged to `main`** (merge `3b0205d`, branch deleted). The
   whole Slice H–O arc + the measured run landed on main. README was reworked
   (reader-facing: no internal slice jargon, a clear done/not-done/next section, a
