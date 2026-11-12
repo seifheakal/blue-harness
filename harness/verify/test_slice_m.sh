@@ -3,15 +3,17 @@
 #
 # The Slice-G PE scanner existed but was only reachable via `make audit-pe`. This
 # slice teaches the skill to detect the format by magic byte and route the one
-# `audit`/`report`/`recommend` front door to the right scanner — honestly: the
-# post-build apply/harden passes are ELF-only, so they REFUSE a PE rather than
-# faking it.
+# `audit`/`report`/`recommend` front door to the right scanner. Since Slice P, a
+# PE also has a post-build harden path, so apply/harden DISPATCH a PE to the PE
+# hardener (writing a separate output, leaving the input untouched) rather than
+# refusing — the ELF-only transforms are never faked onto a PE.
 #
 # Proves:
 #   (A) `carapace audit` routes ELF→ELF scanner, PE→PE scanner;
 #   (B) `report`/`recommend` on a PE render the PE audit + the format-independent
 #       server-side truth, and never claim an ELF-only hardening;
-#   (C) `apply`/`harden` REFUSE a PE (rc 3) instead of mangling it;
+#   (C) `apply`/`harden` DISPATCH a PE to the PE hardener (rc 0) and leave the
+#       INPUT byte-identical (output is a separate file — nothing mangled in place);
 #   (D) the ELF path is unregressed (full ordered plan still renders);
 #   (E) an unsupported blob errors cleanly (no traceback).
 #
@@ -52,14 +54,14 @@ grep -qi "carapace_guards.c\|PTRACE_TRACEME\|core-dump suppression guard" "$WORK
 $CARA recommend "$PE" > "$WORK/rec_pe.txt" 2>&1
 grep -q "\[PE\]" "$WORK/rec_pe.txt" && ok "recommend labels the PE format" || bad "recommend didn't mark PE"
 
-hdr "(C) apply/harden REFUSE a PE (honest; rc 3)"
-$CARA harden "$PE" > "$WORK/h.txt" 2>&1; rc=$?
-[ "$rc" -eq 3 ] && grep -qi "harden targets ELF" "$WORK/h.txt" && ok "harden refuses a PE with guidance (rc 3)" || bad "harden did not refuse the PE (rc=$rc)"
-$CARA apply "$PE" > "$WORK/ap.txt" 2>&1; rc=$?
-[ "$rc" -eq 3 ] && ok "apply refuses a PE (rc 3)" || bad "apply did not refuse the PE (rc=$rc)"
-# the PE must be untouched (byte-identical) after a refused harden/apply
+hdr "(C) apply/harden DISPATCH a PE to the PE hardener (rc 0), input untouched"
+$CARA harden "$PE" --out "$WORK/h.hardened.exe" > "$WORK/h.txt" 2>&1; rc=$?
+[ "$rc" -eq 0 ] && grep -qi "harden (PE)" "$WORK/h.txt" && ok "harden dispatches a PE to the PE hardener (rc 0)" || bad "harden did not dispatch the PE (rc=$rc)"
+$CARA apply "$PE" --out "$WORK/ap.stripped.exe" > "$WORK/ap.txt" 2>&1; rc=$?
+[ "$rc" -eq 0 ] && grep -qi "PE COFF-symbol" "$WORK/ap.txt" && ok "apply dispatches a PE to the PE strip (rc 0)" || bad "apply did not dispatch the PE (rc=$rc)"
+# the INPUT PE must be untouched (byte-identical) — outputs are separate files
 python3 "$SAMPLE_DIR/pe_fixture.py" --profile soft --out "$WORK/fixture_ref.exe" >/dev/null 2>&1
-cmp -s "$PE" "$WORK/fixture_ref.exe" && ok "PE left byte-identical (nothing mangled)" || bad "PE was modified by a refused op"
+cmp -s "$PE" "$WORK/fixture_ref.exe" && ok "input PE left byte-identical (output is a separate file)" || bad "input PE was modified in place"
 
 hdr "(D) ELF path unregressed (full ordered plan)"
 $CARA report "$ELF" > "$WORK/r_elf.txt" 2>&1

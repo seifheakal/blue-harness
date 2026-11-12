@@ -85,6 +85,42 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 
 ## Contribution Log (append after every bit — newest at top)
 
+### 2026-11-12
+- **Shipped Implementation Slice P (Windows PE harden path — the first PE harden,
+  42/42 green; 265/265 across 16 slices).** PE was audit-only (Slice G); gave it a
+  post-build **harden** path with three provable, non-breaking levers, each proven
+  **structurally / byte-level on Linux with no Windows host** (the same honesty
+  discipline as the Slice O Mach-O strip):
+  - **COFF-symbol + debug/PDB strip** (`carapace_pe_strip.py`) — clears the COFF
+    symbol table and the debug directory / CodeView PDB-path record in place, size
+    stable; proved **surgical** (every changed byte lies inside a symbol/debug
+    metadata region — the import/export tables, entry point, section headers and
+    `SizeOfImage` are byte-identical, and the dev-identity names + the `.pdb` build
+    path are gone). The PE analog of the ELF/Mach-O identity strip.
+  - **Decoy non-mapped overlay** (`carapace_pe_exhaust.py`) — appends decoy regions
+    to the PE **overlay** (the bytes past every section's raw data, described by no
+    section header, so the loader never maps them), inflating what a whole-file
+    static/AI sweep must ingest while the mapped image is untouched. Proved
+    **append-only** (original file is a byte-identical prefix) and **provably
+    non-mapped** (decoys start past `mapped_end`). Documented *why the overlay* (a
+    non-mapped PE *section* would need a loader-specific trick we can't verify
+    headless, or an offset-shifting header grow that breaks the byte-stable claim).
+  - **Honeytokens + attribution** (`carapace_pe_honeytokens.py`) — plants unique,
+    plausible fake secrets (shared generators with the ELF pass) into the overlay +
+    a **private ledger**; whole-file-`strings` visible but provably inert, and a
+    leaked token is attributed back to its exact build (`check`).
+  - **Routed through the skill honestly:** `carapace apply <pe>` runs the strip and
+    `carapace harden <pe>` chains all three (writing a separate output, leaving the
+    input byte-identical), then plainly lists the build-time levers it did **not**
+    apply (relink `/DYNAMICBASE /NXCOMPAT /GUARD:CF`, string encryption, runtime+
+    server Authenticode check) and the server-side Strong truth — never faking a
+    build-time guard onto a built PE. Updated Slice M (PE now dispatches, not
+    refuses); ELF and Mach-O paths unchanged.
+  - **Kept the honesty line precise:** tier + named bypass on every lever, never
+    "unbreakable", and *runtime-identical is platform-gated to a Windows host* (the
+    same class of gating as the Mach-O macOS host and the Slice K VM). Proof:
+    `harness/verify/test_slice_p.sh`.
+
 ### 2026-11-11
 - **Ran Slice K for real — the first *measured* RE-resistance before/after (isolated
   operator VM).** Stood up a network-isolated, operator-owned VM and pointed a local

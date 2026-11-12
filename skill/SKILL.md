@@ -25,9 +25,15 @@ python3 skill/carapace.py install    [--user|--dir DIR]    # symlink the skill i
 
    The front door **auto-detects the format by magic byte**: `audit`/`report`/
    `recommend` route a **Linux ELF**, a **Windows PE**, or a **macOS/iOS Mach-O**
-   to the right scanner (an unrecognized file errors cleanly). The post-build
-   `apply`/`harden` transforms are ELF-only and will **refuse** a non-ELF rather
-   than mangle it.
+   to the right scanner (an unrecognized file errors cleanly). Post-build harden
+   coverage per format:
+   - **ELF** — `apply` (identity transform) and `harden` (full post-build chain).
+   - **PE** — `apply` (COFF-symbol + debug/PDB strip) and `harden` (strip → decoy
+     non-mapped overlay → honeytokens). Proven structurally on Linux; runtime-
+     identical needs a Windows host to confirm.
+   - **Mach-O** — `apply` (local-symbol strip); `harden` full-chain is ELF/PE only.
+     Runtime-identical needs a macOS host to confirm.
+   An unsupported format is **refused** rather than mangled.
 
 1. **Audit.** Run `carapace audit <binary>`. It reports the exposure score, the
    posture tier, the signals an AI-assisted RE agent (e.g. `rea`) reads for free

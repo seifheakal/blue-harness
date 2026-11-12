@@ -5,7 +5,7 @@
 > pass work between chats without dumping context. Keep it short and current.
 
 - Last updated: 2026-11-12
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–O ✅) → Testing ✅ (223/223 via `make verify`, enforced in CI) → all three native formats audited + ELF/Mach-O harden; open items are operator decisions (below)**
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–P ✅) → Testing ✅ (265/265 via `make verify`, enforced in CI) → all three native formats audited; ELF/PE/Mach-O all have a post-build harden path; open items are operator decisions (below)**
 - Competitive scan done (2026-11-05): `research/findings/2026-11-05-competitive-landscape.md`
   — peers now defend against AI-RE (BLA ~2.3k★ the serious one). Operator decision:
   **absorb their good ideas into Carapace** ("engulf"), keeping our native-depth +
@@ -327,6 +327,45 @@
     (stated in the tool + verify, like the Slice K VM). Tier Speed-bump→Meaningful;
     bypass: exported names remain, behavior recoverable.
 
+- **Implementation — Slice P ✅ (Windows PE harden path — first PE harden; 42/42;
+  now 265/265 across 16 slices).** PE was audit-only (Slice G); now it has a
+  post-build harden path with three provable, non-breaking levers, all proven
+  STRUCTURALLY / byte-level on Linux with NO Windows host (same discipline as the
+  Slice O Mach-O strip):
+  - **Harden:** `harness/harden/carapace_pe_strip.py` — COFF symbol table + debug
+    directory / CodeView PDB-path strip, **in-place, size stable**, proven surgical
+    (only symbol/debug metadata bytes change; imports/exports/entry/sections/
+    `SizeOfImage` byte-identical). `harness/harden/carapace_pe_exhaust.py` — decoy
+    **non-mapped OVERLAY** regions (append-only; past every section's raw end, so
+    the loader never maps them). `harness/harden/carapace_pe_honeytokens.py` —
+    plausible fake secrets into the overlay + a **private ledger** (poison +
+    attribution; token generators shared with the ELF Slice J).
+  - **Audit:** `pe_exposure_audit.py` gains `decoy_overlay_present` +
+    `honeytokens_present` (guards line; not scored) and its PDB recommendation now
+    points at `carapace_pe_strip.py`.
+  - **Fixture:** `pe_fixture.py` gains an `exposed` profile + `--coff-symbols`/
+    `--signed` overrides so the strip has a COFF symbol table AND a PDB to remove
+    (soft/hard/packed defaults untouched).
+  - **Skill:** `carapace apply <pe>` → the strip; `carapace harden <pe>` → the full
+    chain (strip → decoy overlay → honeytokens), writing a separate output + the
+    private ledger, then honestly listing the build-time levers NOT applied (relink
+    `/DYNAMICBASE /NXCOMPAT /GUARD:CF`, string encryption, runtime+server
+    Authenticode) and the server-side Strong truth. Never fakes a build-time guard.
+    `make harden-pe BIN=…`. Slice M updated (PE now dispatches, not refuses);
+    ELF/Mach-O paths unchanged.
+  - **Verify:** `harness/verify/test_slice_p.sh` (**42/42**) — audit flips
+    present↔absent for all three levers; dev names + `.pdb` gone, imports preserved,
+    strip surgical (every changed byte inside a metadata region), size stable;
+    decoys provably non-mapped (append-only + past `mapped_end`); honeytokens unique
+    + AKIA-plausible + strings-visible + attributable (rc 7) + unique per build;
+    skill drives apply/harden; honest refusals (nothing-to-strip rc 2, non-PE rc 2)
+    + Authenticode warnings + no overclaim.
+  - **Honest limit:** we can't execute a PE on Linux, so this is a **structural**
+    proof; **runtime-identical is platform-gated to a Windows host** (same class of
+    gating as the Mach-O macOS host + the Slice K VM). Tiers: strip
+    Speed-bump→Meaningful; exhaust Trivial→Speed-bump; honeytokens Speed-bump /
+    Meaningful for DETECTION — each with a named bypass.
+
 ## Status: absorption plan complete
 Every in-scope idea from the competitive scan is now folded in and
 mechanism-proven: **I** (exhaust), **J** (poison/honeytokens), **K** (empirical
@@ -349,13 +388,16 @@ are **operator decisions / operator-gated actions**, not pending build work.
    mechanism-proven native core; add a web/bundle track only as an explicit,
    separately-tiered second track, never silently. Confirm before any such work.
 3. **PE/Mach-O reach** — ✅ DONE. PE dispatch (Slice M) + Mach-O audit (Slice N) +
-   Mach-O local-symbol **harden** (Slice O). All three native formats are audited
-   and auto-detected; ELF and Mach-O have a post-build harden path. Possible future
-   increments (in-scope, no VM): more Mach-O harden (decoy/exhaust/honeytokens as
-   added segments — trickier than ELF, needs care without a macOS host to verify),
-   a PE harden path, and mobile-container reach (APK `.so` / iOS). None pressing;
-   raise with the operator before starting. **Mach-O runtime verification is
-   platform-gated to a macOS host** (same class of gating as open item 1's VM).
+   Mach-O local-symbol **harden** (Slice O) + **PE harden path** (Slice P: COFF/
+   debug strip, decoy non-mapped overlay, honeytokens). All three native formats
+   are audited and auto-detected, and **ELF, PE and Mach-O all have a post-build
+   harden path**. Possible future increments (in-scope, no VM): more Mach-O harden
+   (decoy/exhaust/honeytokens as added segments — trickier than ELF, needs care
+   without a macOS host to verify), and mobile-container reach (APK `.so` / iOS).
+   None pressing; raise with the operator before starting. **PE and Mach-O runtime
+   verification is platform-gated to a Windows / macOS host respectively** (same
+   class of gating as open item 1's VM — the harness proves the transforms
+   structurally, byte-level, with no such host).
 
 ## Roadmap — absorbed from the competitive scan (ordered)
 - **Slice I — Exhaust** — ✅ done.
@@ -366,9 +408,10 @@ are **operator decisions / operator-gated actions**, not pending build work.
   `research/findings/2026-11-11-slice-k-empirical-run.md`.
 - **Slice L — one-command `carapace harden` + skill `install`** — ✅ done (UX
   parity with `npx … harden .`, without faking build-time guards).
-- **PE/Mach-O reach** — ✅ done: PE dispatch (Slice M) + Mach-O audit (Slice N);
-  the skill auto-detects ELF/PE/Mach-O. A Mach-O/PE *harden* path (beyond audit)
-  remains a possible future increment.
+- **PE/Mach-O reach** — ✅ done: PE dispatch (Slice M) + Mach-O audit (Slice N) +
+  Mach-O harden (Slice O) + **PE harden (Slice P)**; the skill auto-detects
+  ELF/PE/Mach-O and all three have a post-build harden path. Remaining future
+  increments: more Mach-O harden (added segments) + mobile-container reach.
 - **REJECTED as a defense:** instruction-file barriers / terminal shims (antirea
   style) — relies on a cooperative model; violates CLAUDE.md §2. Never scored.
 
