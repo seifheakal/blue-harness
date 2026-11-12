@@ -34,7 +34,7 @@ before/after diff:
 Run it:
 
 ```bash
-make verify     # every slice test, one posture summary → 223/223
+make verify     # every slice test, one posture summary → 265/265
 make demo       # audit a sample build, show its plan, then prove every defense fires
 ```
 
