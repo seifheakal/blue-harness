@@ -22,9 +22,20 @@ PROFILES = {
     "hard":   dict(dll_characteristics=DC_DYNAMIC_BASE | DC_NX_COMPAT | DC_GUARD_CF | DC_HIGH_ENTROPY_VA,
                    pdb=False, signed=True),
     "packed": dict(dll_characteristics=0, packer=True, high_entropy_text=True),
+    # "exposed" = soft + a COFF symbol table carrying dev-identity names, so the
+    # Slice-P PE strip has both a symbol table AND a PDB path to remove.
+    "exposed": dict(dll_characteristics=0, pdb=True, signed=False, coff_symbols=True),
 }
 
 DEFAULT_IMPORTS = {"KERNEL32.dll": ["CreateFileW", "VirtualProtect", "GetProcAddress"]}
+# Dev-identity symbol names the strip must remove. A mix of <=8 char (inline in
+# the IMAGE_SYMBOL Name field) and longer names (carried in the COFF string table)
+# so both strip paths are exercised.
+DEFAULT_COFF_SYMBOLS = [
+    "start", "c+decode",                       # inline (<=8 bytes)
+    "compute_license_check", "g_secret_key",   # string-table (>8 bytes)
+    "decrypt_blob_xor", "verify_entitlement",
+]
 DEFAULT_STRINGS = [
     "https://license.example.test/activate?sku=PRO",
     "ENTITLEMENT=pro_unlocked",
@@ -38,9 +49,31 @@ RDATA_RVA = 0x2000
 RDATA_OFF = 0x400
 
 
+def _build_coff_symbols(names, section_number=1):
+    """Return (symbol_table_bytes, string_table_bytes, count). IMAGE_SYMBOL is
+    18 bytes: Name(8) Value(u32) SectionNumber(i16) Type(u16) StorageClass(u8)
+    NumberOfAuxSymbols(u8). Names >8 bytes live in the string table (Name field =
+    0,0,0,0 + u32 offset); the string table is a u32 size (incl. itself) + NUL
+    strings."""
+    strtab = bytearray(b"\x00\x00\x00\x00")   # size patched at the end
+    syms = bytearray()
+    for i, nm in enumerate(names):
+        nb = nm.encode()
+        if len(nb) <= 8:
+            name_field = nb.ljust(8, b"\x00")
+        else:
+            off = len(strtab)
+            strtab += nb + b"\x00"
+            name_field = struct.pack("<II", 0, off)
+        # Value, SectionNumber, Type=0x20 (function), StorageClass=2 (external), 0 aux
+        syms += name_field + struct.pack("<IhHBB", 0x1000 + i * 0x10, section_number, 0x20, 2, 0)
+    struct.pack_into("<I", strtab, 0, len(strtab))
+    return bytes(syms), bytes(strtab), len(names)
+
+
 def build(path, dll_characteristics=0, imports=None, strings=None,
           pdb=False, signed=False, dotnet=False, packer=False,
-          high_entropy_text=False):
+          high_entropy_text=False, coff_symbols=False):
     imports = imports or DEFAULT_IMPORTS
     strings = strings or DEFAULT_STRINGS
 
@@ -142,10 +175,20 @@ def build(path, dll_characteristics=0, imports=None, strings=None,
     soff = off + SIZE_OPT
     headers[soff:soff + len(sects)] = sects
 
-    body = bytes(headers) + text + rdata_raw
+    # COFF symbol table (optional): placed after the section raw data, pointed to
+    # by the COFF header's PointerToSymbolTable / NumberOfSymbols.
+    symblob = b""
+    if coff_symbols:
+        symtab_off = len(headers) + len(text) + len(rdata_raw)
+        syms, strs, nsym = _build_coff_symbols(DEFAULT_COFF_SYMBOLS)
+        symblob = syms + strs
+        coff_hdr = E_LFANEW + 4
+        struct.pack_into("<I", headers, coff_hdr + 8, symtab_off)   # PointerToSymbolTable
+        struct.pack_into("<I", headers, coff_hdr + 12, nsym)        # NumberOfSymbols
+
     cert = b""
     if signed:
-        cert_off = len(body)
+        cert_off = len(headers) + len(text) + len(rdata_raw) + len(symblob)
         cert = b"\x30\x82\x01\x00" + os.urandom(0x80)   # a dummy PKCS#7-ish blob
         dirs[4] = (cert_off, len(cert))
 
@@ -153,7 +196,7 @@ def build(path, dll_characteristics=0, imports=None, strings=None,
     dir_base = E_LFANEW + 24 + 0x70
     for i, (r, s) in enumerate(dirs):
         struct.pack_into("<II", headers, dir_base + i * 8, r, s)
-    body = bytes(headers) + text + rdata_raw + cert
+    body = bytes(headers) + text + rdata_raw + symblob + cert
 
     with open(path, "wb") as fh:
         fh.write(body)
@@ -164,9 +207,18 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description="Generate a minimal PE32+ fixture for the audit.")
     ap.add_argument("--out", required=True)
     ap.add_argument("--profile", choices=sorted(PROFILES), default="soft")
+    # overrides applied on top of the chosen profile (for the Slice-P strip tests)
+    ap.add_argument("--coff-symbols", action="store_true", help="add a COFF symbol table")
+    ap.add_argument("--signed", action="store_true", help="force an Authenticode cert table")
     args = ap.parse_args(argv)
-    build(args.out, **PROFILES[args.profile])
-    print(f"wrote {args.profile} PE fixture -> {args.out}")
+    kw = dict(PROFILES[args.profile])
+    if args.coff_symbols:
+        kw["coff_symbols"] = True
+    if args.signed:
+        kw["signed"] = True
+    build(args.out, **kw)
+    extra = (" +coff-symbols" if kw.get("coff_symbols") else "") + (" +signed" if kw.get("signed") else "")
+    print(f"wrote {args.profile}{extra} PE fixture -> {args.out}")
     return 0
 
 

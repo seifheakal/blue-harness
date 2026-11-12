@@ -252,6 +252,11 @@ def analyze(path):
     if high_entropy and not packer:
         packer.append("high-entropy (possible packing)")
 
+    # Carapace post-build levers (overlay-resident; detected, never scored — they
+    # are COST/DETECTION, not an exposure change). Mirrors the ELF guards section.
+    decoy_overlay_present = b"__CARAPACE_PE_EXH_" in d
+    honeytokens_present = b"__CARAPACE_PE_HONEY__" in d
+
     s = {
         "file": os.path.basename(path),
         "format": "PE32+" if pe.pe32plus else "PE32",
@@ -271,6 +276,8 @@ def analyze(path):
         "imports": {k: v[:16] for k, v in list(imports.items())[:16]},
         "import_count": import_count,
         "export_count": pe.export_count(),
+        "decoy_overlay_present": decoy_overlay_present,
+        "honeytokens_present": honeytokens_present,
     }
     s["score"], s["tier"], s["recommendation"] = score(s)
     return s
@@ -312,9 +319,10 @@ def score(s):
 
 def recommend(s):
     h = s["hardening"]
-    if s["debug_info_present"]:
-        return ("Don't ship the PDB / debug directory — strip build paths & symbols. "
-                "Tier: Meaningful. Bypass: the agent reasons from behavior without symbols.")
+    if s["debug_info_present"] or s["symbols_present"]:
+        return ("Strip the COFF symbol table + debug directory / PDB path "
+                "(harness/harden/carapace_pe_strip.py). Tier: Speed-bump→Meaningful. "
+                "Bypass: the agent reasons from imports/behavior without symbols.")
     if not (h["aslr"] and h["dep_nx"] and h["cfg"]):
         return ("Link with /DYNAMICBASE /NXCOMPAT /GUARD:CF /HIGHENTROPYVA. "
                 "Tier: raises exploitation effort — it does NOT block decompilation.")
@@ -351,6 +359,8 @@ def render(s):
     for dll, fns in list(s["imports"].items())[:4]:
         L.append(f"      {dll}: {', '.join(fns[:6])}{' …' if len(fns) > 6 else ''}")
     L.append(f"    .NET / packer .......... dotnet={yn(s['dotnet'])}; packer={', '.join(s['packer']) or 'none'}")
+    L.append(f"    Carapace levers ........ decoy-overlay={yn(s.get('decoy_overlay_present', False))}; "
+             f"honeytokens={yn(s.get('honeytokens_present', False))}  (post-build; COST/DETECTION, not scored)")
     L.append("")
     L.append("  Hardening flags (parity with rea's inspect_pe_load_config):")
     L.append(f"    ASLR={yn(h['aslr'])} | DEP/NX={yn(h['dep_nx'])} | CFG={yn(h['cfg'])} | "

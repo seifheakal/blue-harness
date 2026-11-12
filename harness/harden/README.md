@@ -252,3 +252,42 @@ correct order is strip → codesign on the build host (the tool warns if signed)
 **Tier:** *Speed-bump→Meaningful*. **Named bypass:** the exported names remain and
 a thorough agent recovers logic from behavior/xrefs regardless of names. Proof
 (structural): `../verify/test_slice_o.sh`.
+
+---
+
+## Windows PE harden path (Slice P) — the first PE harden
+
+PE was audit-only (Slice G, `audit/pe_exposure_audit.py`). Slice P gives it a
+post-build **harden** path with three provable, non-breaking levers — all
+byte-level, **no Windows toolchain**, proven **structurally** on Linux with no
+Windows host (exactly how the Slice O Mach-O strip is proven). Drive the whole set
+with `carapace harden <exe>`, or run a lever directly.
+
+| Lever (`carapace_pe_*.py`) | What it does | Why it's non-breaking | Tier · named bypass |
+|---|---|---|---|
+| `carapace_pe_strip.py` | clears the **COFF symbol table** + **debug directory / CodeView PDB-path** | COFF symbols + debug data are never read by the running program (a debugger reads them); **in-place, size stable**; imports/exports/entry/sections/`SizeOfImage` byte-identical | **Speed-bump→Meaningful** · imports + exported names remain; behaviour recoverable |
+| `carapace_pe_exhaust.py` | appends decoy **NON-MAPPED overlay** regions (surface exhaustion) | the loader builds the image from the section table up to `SizeOfImage`; **overlay bytes are never mapped**. Append-only → the original file is a byte-identical prefix | **Trivial→Speed-bump** · map only section-covered bytes (the overlay is ignored) |
+| `carapace_pe_honeytokens.py` | plants unique plausible fake secrets into the overlay + a **private ledger** | overlay = non-mapped; append-only; tokens are whole-file-`strings` visible but provably unreferenced. `check` attributes a leaked token to its build | **Speed-bump** (poison) / **Meaningful FOR DETECTION** (attribution) · xref-validate + rename the footer marker |
+
+```
+python3 carapace_pe_strip.py --in app.exe --out app.stripped.exe
+python3 carapace_pe_exhaust.py app.exe app.exh.exe --sections 4 --section-size 131072
+python3 carapace_pe_honeytokens.py plant app.exe app.honey.exe --ledger private_ledger.json --build-tag rc1
+python3 carapace_pe_honeytokens.py check --ledger private_ledger.json --input leak.txt
+```
+
+**Why the overlay (and not new section-table entries):** a provably non-mapped PE
+*section* would need either a loader-specific "don't map" trick we can't verify
+without a Windows host, or growing `SizeOfHeaders` (which shifts every file offset
+and breaks the byte-stable claim). The overlay is the loader-independent,
+structurally-provable non-mapped home, so the proof needs no Windows host.
+
+**Honest limit (CLAUDE.md §3):** we run on Linux and **cannot execute a PE**, so —
+like the Mach-O strip — we do **not** claim runtime-identical here. The verify
+proves each lever is **surgical / append-only** and the decoys are **provably in
+the overlay** (past every section's raw data); **runtime-identical is platform-
+gated to a Windows host**. Appending overlay data or stripping metadata invalidates
+an Authenticode signature, so sign **after** hardening (each tool warns if signed).
+The honeytoken token generators are **shared** with the ELF pass
+(`carapace_honeytokens.generate/check`). Keep every ledger **PRIVATE**. These are
+**cost / detection, not prevention.** Proof: `../verify/test_slice_p.sh`.
