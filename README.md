@@ -12,6 +12,17 @@
 
 ---
 
+> [!NOTE]
+> **About the measured numbers in this README.** The empirical before/after
+> (baseline vs. hardened) was run on a **single laptop — an NVIDIA RTX 3070 Laptop
+> GPU (8 GB VRAM) with 16 GB RAM** — so the attacker was a small, 4-bit-quantised
+> **7-billion-parameter** model (`qwen2.5-coder:7b`), about the largest that fits
+> on that hardware, **not a frontier model**. Read the result as an **illustrative
+> floor from a constrained local attacker (N=1)**, not a ceiling: more VRAM, a
+> larger local model, or a hosted frontier model would push harder. Full
+> methodology and caveats:
+> [`research/findings/2026-11-11-slice-k-empirical-run.md`](research/findings/2026-11-11-slice-k-empirical-run.md).
+
 ## Quickstart (see it in ~30 seconds)
 
 ```bash
@@ -82,6 +93,21 @@ AI-RE agent against the baseline vs. the hardened build on your own sandboxed VM
 and get a measured before/after (a "crack" counts only if it hashes to the sealed
 flag; missing figures read *not measured*, never estimated). See the
 [runbook](docs/workflow/slice-k-empirical-runbook.md).
+
+**First measured run (baseline vs. hardened, on the laptop in the note above).**
+The agent cracked the unprotected baseline in 3 steps / ~1.6 s (hash-verified
+against the seal). Against the hardened build it burned **13.4× the tokens and
+~122× the wall-clock and still failed** — it ran out of productive moves and
+returned a wrong flag, correctly scored *not cracked*. **String encryption**,
+**anti-debug guards** and **analysis-surface exhaustion** were all observed
+firing. Honest footnote worth stating plainly: the **honeytoken / canary layer
+(Slice J) — the decoy secrets that poison an agent's string-mined findings and the
+private ledger that attributes a leaked crack — never fired.** The agent was
+stopped upstream by the three defenses above before it could reach, and be fooled
+into reporting, a decoy, so Slice J's poison-and-attribution effect went
+unexercised in this run. It resisted here via encryption + anti-debug + exhaustion,
+not via the poison layer.
+
 Details and the attacker-weapon mapping: [`docs/re-techniques/rea.md`](docs/re-techniques/rea.md).
 
 ## What it is / what it isn't
