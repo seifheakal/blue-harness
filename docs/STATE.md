@@ -4,13 +4,20 @@
 > at the start and **updates it at the end** before handing off. This is how we
 > pass work between chats without dumping context. Keep it short and current.
 
-- Last updated: 2026-11-11
+- Last updated: 2026-11-12
 - Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–O ✅) → Testing ✅ (223/223 via `make verify`, enforced in CI) → all three native formats audited + ELF/Mach-O harden; open items are operator decisions (below)**
 - Competitive scan done (2026-11-05): `research/findings/2026-11-05-competitive-landscape.md`
   — peers now defend against AI-RE (BLA ~2.3k★ the serious one). Operator decision:
   **absorb their good ideas into Carapace** ("engulf"), keeping our native-depth +
   mechanism-proof edge. Absorb ideas, not their MIT code (clean-room).
 - Worked specimen: **`rea`** (morluto/rea, npm `rea-agents`) — the P0 reference.
+- **2026-11-12 — PR #1 merged to `main`** (merge `3b0205d`, branch deleted). The
+  whole Slice H–O arc + the measured run landed on main. README was reworked
+  (reader-facing: no internal slice jargon, a clear done/not-done/next section, a
+  real comparison table, and a red top call-to-arms) and now opens with the
+  hardware/model disclaimer. New `docs/HOW-WE-TESTED.md` documents both testing
+  layers (mechanism proofs + the N=1 empirical run) and **publicly solicits
+  bigger-model runs** so the one datapoint gets sharper over time.
 
 ## Done so far
 - Project scaffolded; scope locked to **native binaries + mobile** (CLAUDE.md §2).
@@ -372,7 +379,11 @@ are **operator decisions / operator-gated actions**, not pending build work.
   (authoritative `tools/list`, Frida-script screening, GDB/MI reality, stripped
   decompile) remain open, as does a re-run with a reliably tool-calling model
   (e.g. Codex-native `gpt-oss`) and/or `rea` itself to exercise Slice J + the
-  decompiler path. Nothing is blocked on it.
+  decompiler path. Nothing is blocked on it. **As of 2026-11-12 this re-run is
+  publicly solicited** in the README (red top box) and `docs/HOW-WE-TESTED.md` —
+  anyone with the hardware can run it against a bigger model and PR the scored
+  result; a stronger, reliably tool-calling attacker is the only way to exercise
+  the honeytoken poison/attribution path, which the 7B run never reached.
 - P0 entries still `list (verify in research)`: `disasm-mcp`+`agentic-re` are in
   analysis (via `rea.md`); the rest await their own research passes.
 
