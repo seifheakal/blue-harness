@@ -4,8 +4,8 @@
 > at the start and **updates it at the end** before handing off. This is how we
 > pass work between chats without dumping context. Keep it short and current.
 
-- Last updated: 2026-11-12
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–P ✅) → Testing ✅ (265/265 via `make verify`, enforced in CI) → all three native formats audited; ELF/PE/Mach-O all have a post-build harden path; open items are operator decisions (below)**
+- Last updated: 2026-11-13
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–Q ✅) → Testing ✅ (304/304 via `make verify`, enforced in CI) → all three native formats audited; ELF/PE/Mach-O all have a post-build harden path (Mach-O now at depth — strip + decoy segment + honeytokens); open items are operator decisions (below)**
 - Competitive scan done (2026-11-05): `research/findings/2026-11-05-competitive-landscape.md`
   — peers now defend against AI-RE (BLA ~2.3k★ the serious one). Operator decision:
   **absorb their good ideas into Carapace** ("engulf"), keeping our native-depth +
@@ -366,6 +366,47 @@
     Speed-bump→Meaningful; exhaust Trivial→Speed-bump; honeytokens Speed-bump /
     Meaningful for DETECTION — each with a named bypass.
 
+- **Implementation — Slice Q ✅ (Mach-O harden DEPTH — parity with ELF/PE; 39/39;
+  now 304/304 across 17 slices).** Mach-O was harden-only via the Slice O local-symbol
+  strip; Slice Q adds the two remaining post-build levers as Mach-O-native constructs,
+  all proven STRUCTURALLY / byte-level on Linux with NO macOS host (same discipline as
+  Slice O and the PE path, Slice P):
+  - **Harden:** `harness/harden/carapace_macho_segment.py` — shared mechanism:
+    `append_trailer` (decoy/honey bytes appended past `mapped_end` → non-mapped, the
+    Mach-O analog of the PE overlay) + `add_decoy_segment` (splice a real
+    `LC_SEGMENT_64 __CARAPACE_EXH` with **`vmsize=0`** — dyld IGNORES it → maps nothing
+    — into the header pad **in place**, or fall back to trailer-only with the
+    `-headerpad_max_install_names` remedy when there is < 72 B of pad; never corrupts).
+    `carapace_macho_exhaust.py` (decoy non-mapped segment + bulk decoy trailer) and
+    `carapace_macho_honeytokens.py` (plausible fake secrets in the non-mapped trailer +
+    a **private ledger**; token generators shared with the ELF Slice J / PE Slice P).
+  - **Audit:** `macho_exposure_audit.py` gains `decoy_segment_present` +
+    `carapace_segment_count` + `honeytokens_present` (guards line; not scored) and its
+    `recommend()` now chains strip → decoy segment → honeytokens.
+  - **Fixture:** `macho_fixture.py` gains `--headerpad N` (room to splice a load command
+    in place) + `--signed` override (defaults preserve the Slice N/O fixtures byte-for-byte).
+  - **Skill:** `carapace apply <macho>` = strip (unchanged); `carapace harden <macho>` =
+    the full chain (strip → decoy segment + trailer → honeytokens), writing a separate
+    output + the private ledger, then honestly listing the build-time levers NOT applied
+    (-fPIE/-pie + `__RESTRICT`, string-encryption codegen, runtime+server code signing)
+    and the server-side Strong truth. Never fakes a build-time guard. `make harden-macho`
+    now routes the full chain (was strip-only). Slice N updated (harden now dispatches
+    Mach-O, not refuses); ELF/PE paths unchanged.
+  - **Verify:** `harness/verify/test_slice_q.sh` (**39/39**) — audit flips present↔absent
+    for both levers; the added segment has `vmsize==0` + prot NONE (maps nothing);
+    surgical splice (every changed in-file byte is a mach-header count or the consumed
+    zero pad); decoy trailer provably past `mapped_end` (non-mapped); honeytokens unique
+    + AKIA-plausible + strings-visible + attributable (rc 7) + unique per build; skill
+    drives apply/harden; honest refusals (fat rc 2, 32-bit rc 2, non-Mach-O rc 2) +
+    code-signature warnings + the no-header-pad fallback (trailer still applied, LC
+    deferred with the `-headerpad` remedy) + no overclaim.
+  - **Honest limit:** runtime-identical AND real-dyld acceptance of the `vmsize=0` decoy
+    segment are **platform-gated to a macOS host** (same class of gating as the Slice O
+    macOS host, the PE Windows host, and the Slice K VM). Detail + cited format facts:
+    `research/findings/2026-11-13-macho-harden-levers.md`, `docs/re-techniques/macho-harden.md`.
+    Tiers: decoy segment/exhaust Trivial→Speed-bump; honeytokens Speed-bump /
+    Meaningful for DETECTION — each with a named bypass.
+
 ## Status: absorption plan complete
 Every in-scope idea from the competitive scan is now folded in and
 mechanism-proven: **I** (exhaust), **J** (poison/honeytokens), **K** (empirical
@@ -389,15 +430,16 @@ are **operator decisions / operator-gated actions**, not pending build work.
    separately-tiered second track, never silently. Confirm before any such work.
 3. **PE/Mach-O reach** — ✅ DONE. PE dispatch (Slice M) + Mach-O audit (Slice N) +
    Mach-O local-symbol **harden** (Slice O) + **PE harden path** (Slice P: COFF/
-   debug strip, decoy non-mapped overlay, honeytokens). All three native formats
-   are audited and auto-detected, and **ELF, PE and Mach-O all have a post-build
-   harden path**. Possible future increments (in-scope, no VM): more Mach-O harden
-   (decoy/exhaust/honeytokens as added segments — trickier than ELF, needs care
-   without a macOS host to verify), and mobile-container reach (APK `.so` / iOS).
-   None pressing; raise with the operator before starting. **PE and Mach-O runtime
-   verification is platform-gated to a Windows / macOS host respectively** (same
-   class of gating as open item 1's VM — the harness proves the transforms
-   structurally, byte-level, with no such host).
+   debug strip, decoy non-mapped overlay, honeytokens) + **Mach-O harden depth**
+   (Slice Q: decoy non-mapped segment `vmsize=0` LC + trailer, honeytokens). All
+   three native formats are audited and auto-detected, and **ELF, PE and Mach-O all
+   have a post-build harden path** (Mach-O now at parity-ish depth). Remaining
+   future increments (in-scope, no VM): string-encryption **codegen** for PE/Mach-O
+   (ELF has it), and mobile-container reach (APK `.so` / iOS). None pressing; raise
+   with the operator before starting. **PE and Mach-O runtime verification is
+   platform-gated to a Windows / macOS host respectively** (same class of gating as
+   open item 1's VM — the harness proves the transforms structurally, byte-level,
+   with no such host).
 
 ## Roadmap — absorbed from the competitive scan (ordered)
 - **Slice I — Exhaust** — ✅ done.
@@ -409,9 +451,10 @@ are **operator decisions / operator-gated actions**, not pending build work.
 - **Slice L — one-command `carapace harden` + skill `install`** — ✅ done (UX
   parity with `npx … harden .`, without faking build-time guards).
 - **PE/Mach-O reach** — ✅ done: PE dispatch (Slice M) + Mach-O audit (Slice N) +
-  Mach-O harden (Slice O) + **PE harden (Slice P)**; the skill auto-detects
-  ELF/PE/Mach-O and all three have a post-build harden path. Remaining future
-  increments: more Mach-O harden (added segments) + mobile-container reach.
+  Mach-O strip (Slice O) + **PE harden (Slice P)** + **Mach-O harden depth (Slice Q:
+  decoy non-mapped segment + honeytokens)**; the skill auto-detects ELF/PE/Mach-O and
+  all three have a post-build harden path. Remaining future increments:
+  string-encryption codegen for PE/Mach-O + mobile-container reach.
 - **REJECTED as a defense:** instruction-file barriers / terminal shims (antirea
   style) — relies on a cooperative model; violates CLAUDE.md §2. Never scored.
 

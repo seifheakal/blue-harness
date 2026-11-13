@@ -84,6 +84,8 @@ strength tier and a **named bypass** — nothing here claims to be unbreakable.
 | Analysis-surface exhaustion | the "ingest everything" agent's budget | Trivial→Speed-bump | filter to real sections + referenced symbols |
 | Honeytokens / canaries | poisons string-mined "findings" + attributes a leak | Speed-bump / Meaningful (detection) | xref-validate drops decoys; rename the tell-tale section |
 | Mach-O local-symbol strip | internal names in a macOS/iOS binary | Speed-bump→Meaningful | exported names remain; runtime-identical proven on macOS only |
+| Mach-O decoy non-mapped segment (`vmsize=0` LC + trailer) | the "ingest everything" agent on a Mach-O | Trivial→Speed-bump | a loader-faithful tool drops `vmsize==0` LCs + the trailer |
+| Mach-O honeytokens / canaries | poisons string-mined "findings" + attributes a leak | Speed-bump / Meaningful (detection) | xref-validate drops decoys; rename the tell-tale marker |
 
 A [Claude skill](skill/) reads the posture and tells you the next highest-value
 hardening — with its tier and bypass, every time.
@@ -93,19 +95,21 @@ hardening — with its tier and bypass, every time.
 **Working today**
 - Read-only exposure audit + score for **all three native formats** — Linux ELF,
   Windows PE, macOS/iOS Mach-O — auto-detected by magic byte.
-- The **nine countermeasures above** on Linux ELF (build-time + post-build), a
+- The **countermeasures above** on Linux ELF (build-time + post-build), a
   Windows **PE** harden path (COFF/debug strip + decoy non-mapped overlay +
-  honeytokens), and a first macOS/iOS pass (local-symbol strip).
+  honeytokens), and a **macOS/iOS Mach-O** harden path (local-symbol strip +
+  decoy non-mapped segment + honeytokens). All three formats auto-detected, all
+  three with a post-build harden path.
 - One-command `harden`, the driving Claude skill, and a **CI gate that re-proves
-  every defense fires on each push** (265 checks green).
+  every defense fires on each push** (304 checks green).
 - An empirical harness (digest-sealed CrackMe + honest scorer) and **one measured
   before/after run**.
 
 **Not done yet**
-- **Deeper build-time hardening for Windows PE** — the post-build path ships (COFF/
-  debug strip + decoy overlay + honeytokens); relink flags and string encryption
-  still need a rebuild, and runtime checks need a Windows host to verify — and
-  **deeper macOS/iOS** (one pass so far; runtime checks need a Mac to verify).
+- **Build-time hardening across PE & Mach-O** — both post-build paths ship (PE: COFF/
+  debug strip + decoy overlay + honeytokens; Mach-O: local-symbol strip + decoy
+  non-mapped segment + honeytokens); relink flags and string-encryption **codegen**
+  still need a rebuild, and runtime checks need a Windows / Mac host to verify.
 - **Mobile app reach** — Android native libraries via JNI, iOS app internals.
 - **More measurement** — the before/after is a single run from a small local model
   (the red box at the top).
@@ -113,9 +117,9 @@ hardening — with its tier and bypass, every time.
 **Next, in order**
 1. More measurement against **bigger / reliably tool-calling attackers** — the
    community ask at the top.
-2. A **Windows PE hardening** path (beyond audit).
-3. **Deeper macOS/iOS hardening** (decoys / exhaustion / honeytokens), verified on a
-   Mac.
+2. **String-encryption codegen for PE / Mach-O** (it ships for ELF today).
+3. **Runtime verification on a Windows / Mac host** — lift the post-build harden
+   proofs from structural to runtime-identical.
 4. **Mobile** (Android / iOS) reach.
 
 *Deliberately out of scope:* a web/bundle track (Electron / JS / Wasm / .NET). It
@@ -162,8 +166,8 @@ exhaustion, honeytoken poisoning) as its own, mechanism-proven countermeasures. 
 ## Status
 
 **Active.** All three native formats audited with magic-byte dispatch and each with
-a post-build harden path; nine mechanism-proven countermeasures; a one-command
-`harden`; a CI gate with **265/265 checks green**
+a post-build harden path; mechanism-proven countermeasures across ELF/PE/Mach-O; a
+one-command `harden`; a CI gate with **304/304 checks green**
 ([`make verify`](.github/workflows/verify.yml) on every push and pull
 request — the badge above is that gate); and a digest-sealed CrackMe with an honest
 empirical scorer. Roadmap in [docs/STATE.md](docs/STATE.md).

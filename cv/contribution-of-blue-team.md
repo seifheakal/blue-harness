@@ -85,6 +85,39 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 
 ## Contribution Log (append after every bit — newest at top)
 
+### 2026-11-13
+- **Shipped Implementation Slice Q (Mach-O harden DEPTH — parity with ELF/PE,
+  39/39 green; 304/304 across 17 slices).** Mach-O had only the Slice O local-symbol
+  strip; added the two remaining post-build levers as **Mach-O-native constructs**,
+  proven **structurally / byte-level on Linux with no macOS host** (same discipline as
+  Slice O and the PE path):
+  - **Decoy non-mapped segment + trailer** (`carapace_macho_exhaust.py` on a shared
+    `carapace_macho_segment.py`) — appends bulk decoy bytes to the file **trailer**
+    (past `mapped_end`, so no segment maps them) and splices a real `LC_SEGMENT_64`
+    named `__CARAPACE_EXH` with **`vmsize=0`** into the header pad **in place** (dyld
+    ignores a `vmsize==0` segment → it maps nothing; XNU `loader.h` + dyld). When there
+    is < 72 B of header pad it falls back to a trailer-only decoy and names the
+    `-headerpad_max_install_names` remedy — never corrupts, never silently skips.
+  - **Honeytokens / canaries** (`carapace_macho_honeytokens.py`) — plants plausible
+    fake secrets into the non-mapped trailer + a **private per-build ledger**; a leaked
+    token is attributed back to its exact build (`check`, rc 7). Token generators shared
+    with the ELF (Slice J) and PE (Slice P) passes.
+  - **Audit** (`macho_exposure_audit.py`) gained `decoy_segment_present` /
+    `carapace_segment_count` / `honeytokens_present` (guards line, not scored) and a
+    `recommend()` that chains strip → decoy segment → honeytokens. The skill's
+    `carapace harden <macho>` now runs the full chain (apply stays = strip); `make
+    harden-macho` routes it; the fixture gained `--headerpad` / `--signed` with defaults
+    that keep the Slice N/O fixtures byte-identical.
+  - **Verified** (`test_slice_q.sh`, 39/39): the added segment proven to map nothing
+    (`vmsize==0`, prot NONE); the splice proven **surgical** (every changed in-file byte
+    is a mach-header count or the consumed zero pad); the decoy/honey trailer proven
+    past `mapped_end` (non-mapped); honeytokens unique + AKIA-plausible + strings-visible
+    + attributable + unique per build; honest refusals (fat / 32-bit / non-Mach-O) +
+    code-signature warnings + the header-pad fallback + no overclaim. **Runtime-identical
+    and real-dyld acceptance of the decoy segment are platform-gated to a macOS host.**
+    Cited format facts: `research/findings/2026-11-13-macho-harden-levers.md`;
+    attacker→countermeasure map: `docs/re-techniques/macho-harden.md`.
+
 ### 2026-11-12
 - **Shipped Implementation Slice P (Windows PE harden path — the first PE harden,
   42/42 green; 265/265 across 16 slices).** PE was audit-only (Slice G); gave it a
