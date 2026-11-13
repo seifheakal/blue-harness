@@ -26,8 +26,9 @@ declare -A WHAT=(
     [o]="Mach-O local-symbol strip (first Mach-O harden): locals gone, externals kept, surgical"
     [p]="PE harden path: COFF/debug strip + decoy non-mapped overlay + honeytokens, surgical"
     [q]="Mach-O harden depth: decoy non-mapped segment (vmsize=0 LC) + honeytokens, surgical"
+    [r]="mobile-container reach: unpack APK/IPA, audit + harden native payloads, repack (honest re-sign)"
 )
-ORDER="a b c d e f g h i j k l m n o p q"
+ORDER="a b c d e f g h i j k l m n o p q r"
 
 echo "=================================================================="
 echo "  Carapace — measure it, harden it, PROVE it"

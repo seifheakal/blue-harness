@@ -8,7 +8,7 @@
 
 BIN ?= harness/sample/sample_dev
 
-.PHONY: demo verify audit audit-pe audit-macho report harden harden-pe harden-macho install-skill clean help
+.PHONY: demo verify audit audit-pe audit-macho audit-mobile report harden harden-pe harden-macho harden-mobile harden-apk harden-ipa install-skill clean help
 .DEFAULT_GOAL := help
 
 demo:
@@ -32,6 +32,9 @@ audit-pe:
 audit-macho:
 	@python3 harness/audit/macho_exposure_audit.py "$(BIN)"
 
+audit-mobile:
+	@python3 harness/audit/mobile_container_audit.py "$(BIN)"
+
 report:
 	@$(MAKE) -s -C harness/sample sample_dev
 	@python3 skill/carapace.py report "$(BIN)"
@@ -45,6 +48,16 @@ harden-pe:
 
 harden-macho:
 	@python3 skill/carapace.py harden "$(BIN)"
+
+# Mobile containers (Slice R): reach into an APK/AAB/IPA, harden the native
+# payloads inside (ELF .so / Mach-O) via the per-format hardeners, and repack.
+# One target covers all three (magic-byte dispatch); apk/ipa are convenience aliases.
+harden-mobile:
+	@python3 skill/carapace.py harden "$(BIN)"
+
+harden-apk: harden-mobile
+
+harden-ipa: harden-mobile
 
 install-skill:
 	@python3 skill/carapace.py install
@@ -62,11 +75,13 @@ help:
 	@echo "  make audit    BIN=<elf>   scored exposure report for your own binary"
 	@echo "  make audit-pe BIN=<exe>   scored exposure report for a Windows PE"
 	@echo "  make audit-macho BIN=<o> scored exposure report for a Mach-O (macOS/iOS)"
+	@echo "  make audit-mobile BIN=<apk|aab|ipa> enumerate + audit native payloads inside"
 	@echo "  make report   BIN=<elf>   full audit + the ordered hardening plan"
 	@echo "  make harden   BIN=<elf>   one command: apply every post-build hardening (honest)"
 	@echo "  make harden-pe BIN=<exe>  PE harden: COFF/debug strip + decoy overlay + honeytokens"
 	@echo "  make harden-macho BIN=<o> Mach-O harden: local-symbol strip + decoy non-mapped"
 	@echo "                            segment + honeytokens (honest)"
+	@echo "  make harden-mobile BIN=<apk|aab|ipa> harden the native payloads inside + repack (you re-sign)"
 	@echo "  make install-skill        symlink the skill into .claude/skills/carapace"
 	@echo "  make clean    remove build artifacts"
 	@echo

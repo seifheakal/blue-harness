@@ -117,6 +117,43 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
     and real-dyld acceptance of the decoy segment are platform-gated to a macOS host.**
     Cited format facts: `research/findings/2026-11-13-macho-harden-levers.md`;
     attacker→countermeasure map: `docs/re-techniques/macho-harden.md`.
+- **Shipped Implementation Slice R (mobile-container reach — APK/AAB/IPA; 26/26 on
+  CI, +21 cross-platform here).** Closed the one in-scope format family Carapace
+  could not previously reach into: the native payloads *inside* a mobile package.
+  The harness now unpacks a container (all three are ZIP), enumerates the **native**
+  payloads, and applies the **existing** per-format hardeners to them — no new
+  countermeasure, pure reach:
+  - **Audit-first** (`harness/audit/mobile_container_audit.py`) — classifies the
+    container (APK / AAB / IPA) by marker members, enumerates native payloads by
+    path **and magic byte** (Android `lib/<abi>/*.so` → ELF; iOS app binary +
+    `Frameworks/*.framework/*` + `*.dylib` → Mach-O), and **delegates** each to the
+    existing ELF / Mach-O auditor for a per-payload scored posture. DEX/managed code
+    is enumerated-and-skipped (a separate track, out of scope per CLAUDE.md §2).
+  - **Harden** (`harness/harden/carapace_mobile.py`) — dispatches each payload
+    through the **stable Slice-M format entry point** (`carapace harden`, falling
+    back to `apply`), so it uses whatever each format hardener offers today and
+    **automatically picks up new levers** (e.g. Slice Q's Mach-O decoy/honeytokens)
+    once merged — **no lever is hard-coded**. Repacks the container; collects the
+    PRIVATE de-obfuscation map + honeytoken ledger **outside** the package.
+  - **Honest signing limitation, stated and never faked** — repacking invalidates
+    the APK/IPA signature; the tool + the verify say the **operator re-signs**
+    (apksigner / codesign + provisioning) and that on-device integrity ultimately
+    rests on the **platform verifying the signature**, which a client harness cannot
+    provide or fake (server-side-truth, CLAUDE.md §3).
+  - **Tiers/bypass:** the container layer adds **no** strength of its own — every
+    tier (and bypass) is **inherited** from the delegated ELF/Mach-O slice; the
+    container-level bypass is that the ZIP wrapper is not a barrier (re-unpack the
+    repack). No overclaim: we harden the native payloads, not the DEX/managed code.
+  - **Proof** (`harness/verify/test_slice_r.sh`) — synthetic ZIP fixtures (a
+    toolchain-free ELF `.so` generator + the Mach-O fixture): enumeration delegates
+    correctly (score parity with the standalone auditors), the skill routes
+    containers, a non-mobile ZIP is refused cleanly, and harden **dispatches +
+    repacks** (IPA/Mach-O cross-platform; APK/ELF gated on ELF binutils, like the
+    bare-ELF slices) with the signing limitation + tier + bypass asserted and **no
+    false signing claim**. `make audit-mobile` / `harden-mobile` / `harden-apk` /
+    `harden-ipa`. Research + analysis:
+    `research/findings/2026-11-13-mobile-container-reach.md`,
+    `docs/re-techniques/mobile-containers.md`.
 
 ### 2026-11-12
 - **Shipped Implementation Slice P (Windows PE harden path — the first PE harden,

@@ -65,7 +65,9 @@ _MACHO_MAGICS = {
 
 
 def _detect_format(path):
-    """ELF / PE / Mach-O by magic, so one `audit`/`report` front door covers all."""
+    """ELF / PE / Mach-O / mobile-container by magic, so one front door covers all.
+    A ZIP (PK..) is a mobile container candidate (APK/AAB/IPA); the mobile tools
+    classify it precisely and refuse a non-mobile ZIP cleanly."""
     with open(path, "rb") as f:
         head = f.read(4)
     if head[:4] == b"\x7fELF":
@@ -74,7 +76,22 @@ def _detect_format(path):
         return "pe"
     if head in _MACHO_MAGICS:
         return "macho"
+    if head[:2] == b"PK":
+        return "mobile"
     return "unknown"
+
+
+# Mobile-container tools (Slice R) are wired lazily, like the Mach-O scanner, so
+# the bare-binary path never pays their import cost.
+def _mobile_audit():
+    import importlib
+    return importlib.import_module("mobile_container_audit")
+
+
+def _mobile_harden():
+    import importlib
+    sys.path.insert(0, HARDEN_DIR)
+    return importlib.import_module("carapace_mobile")
 
 
 # Mach-O scanner is wired lazily so the ELF/PE path never pays its import cost
@@ -294,6 +311,13 @@ def cmd_audit(args):
     elif fmt == "macho":
         m = _macho_audit()
         print(m.render(m.analyze(args.binary)))
+    elif fmt == "mobile":
+        mca = _mobile_audit()
+        try:
+            print(mca.render(mca.analyze(args.binary)))
+        except mca.ContainerError as e:
+            print(f"carapace error: {e}", file=sys.stderr)
+            return 2
     else:
         _unknown(args.binary)
     return 0
@@ -301,6 +325,22 @@ def cmd_audit(args):
 
 def cmd_recommend(args):
     fmt = _detect_format(args.binary)
+    if fmt == "mobile":
+        mca = _mobile_audit()
+        try:
+            s = mca.analyze(args.binary)
+        except mca.ContainerError as e:
+            print(f"carapace error: {e}", file=sys.stderr)
+            return 2
+        print(f"Carapace — next hardening for {_rel(args.binary)} "
+              f"[{s['kind'].upper()} / {s['os']}]")
+        print(f"  {s['payload_count']} native payload(s); worst exposure "
+              f"{s['max_score']}/100")
+        print()
+        print(f"  {mca.recommend(s)}")
+        print()
+        print(_SERVER_TRUTH)
+        return 0
     if fmt in ("pe", "macho"):
         if fmt == "pe":
             s = pe_audit.analyze(args.binary)
@@ -338,6 +378,19 @@ def cmd_report(args):
     readout for an operator or for the skill to relay. ELF gets the full plan;
     PE/Mach-O get the format's read-only audit + the server-side truth."""
     fmt = _detect_format(args.binary)
+    if fmt == "mobile":
+        mca = _mobile_audit()
+        try:
+            s = mca.analyze(args.binary)
+        except mca.ContainerError as e:
+            print(f"carapace error: {e}", file=sys.stderr)
+            return 2
+        print(mca.render(s))
+        print()
+        print(f"  Next: {mca.recommend(s)}")
+        print()
+        print(_SERVER_TRUTH)
+        return 0
     if fmt in ("pe", "macho"):
         if fmt == "pe":
             print(pe_audit.render(pe_audit.analyze(args.binary)))
@@ -365,6 +418,14 @@ def cmd_report(args):
 
 def cmd_apply(args):
     fmt = _detect_format(args.binary)
+    if fmt == "mobile":
+        print(f"carapace: {_rel(args.binary)} is a mobile container — use "
+              "`carapace harden` for containers.")
+        print("  It dispatches the per-format native hardeners to each payload "
+              "inside and repacks;")
+        print("  then re-sign (apksigner/codesign). `carapace audit` gives the "
+              "read-only posture.")
+        return 3
     if fmt == "macho":
         # the one safe Mach-O post-build pass: strip LOCAL symbols (strip -x).
         out = args.out or (args.binary + ".stripped")
@@ -620,6 +681,16 @@ def cmd_harden(args):
     import shutil as _sh
     binary = args.binary
     fmt = _detect_format(binary)
+    if fmt == "mobile":
+        mob = _mobile_harden()
+        try:
+            res = mob.harden(binary, out=args.out, build_tag=args.build_tag)
+        except (mob.MobileHardenError, mob.mca.ContainerError,
+                FileNotFoundError) as e:
+            print(f"carapace error: {e}", file=sys.stderr)
+            return 2
+        print(mob.render(res))
+        return 0
     if fmt == "pe":
         return _harden_pe(args, binary)
     if fmt == "macho":

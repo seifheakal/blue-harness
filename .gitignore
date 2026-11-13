@@ -52,6 +52,12 @@ harness/sample/*.honey
 harness/sample/*.stripped
 harness/sample/*.stripped.*
 harness/sample/*.release
+# Mobile-container (Slice R) harden — repacked container + the PRIVATE sidecar
+# dir (de-obf map + honeytoken ledger; the keys — never commit)
+harness/sample/*.hardened.apk
+harness/sample/*.hardened.aab
+harness/sample/*.hardened.ipa
+harness/sample/*.carapace-private/
 # Slice K CrackMe — build outputs (binaries, SEAL, PRIVATE ledger) + the real flag
 harness/crackme/build/
 harness/crackme/secret.local.txt
