@@ -25,8 +25,9 @@ declare -A WHAT=(
     [n]="Mach-O exposure audit (third format): symtab/cstring/dylibs, soft→hard flip, fat parsed"
     [o]="Mach-O local-symbol strip (first Mach-O harden): locals gone, externals kept, surgical"
     [p]="PE harden path: COFF/debug strip + decoy non-mapped overlay + honeytokens, surgical"
+    [q]="Mach-O harden depth: decoy non-mapped segment (vmsize=0 LC) + honeytokens, surgical"
 )
-ORDER="a b c d e f g h i j k l m n o p"
+ORDER="a b c d e f g h i j k l m n o p q"
 
 echo "=================================================================="
 echo "  Carapace — measure it, harden it, PROVE it"

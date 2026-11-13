@@ -13,7 +13,8 @@
 #   (C) __TEXT encryption (LC_ENCRYPTION_INFO cryptid) craters the static-view score;
 #   (D) fat/universal is parsed (slice count reported);
 #   (E) code signature is READ-ONLY (presence reported, the honest note printed);
-#   (F) the skill dispatches Mach-O to this scanner, and apply/harden REFUSE it;
+#   (F) the skill dispatches Mach-O to this scanner, and harden now runs the Mach-O
+#       harden chain (Slice Q);
 #   (G) a non-Mach-O is rejected gracefully.
 #
 # Exit 0 = all hard assertions passed.
@@ -78,7 +79,7 @@ python3 "$AUDIT" "$WORK/mo_hard" | grep -q "READ-ONLY, not verified" && ok "rend
 
 hdr "(F) skill dispatch + honest refusal"
 $CARA audit "$WORK/mo_soft" 2>&1 | grep -q "Mach-O Exposure Audit" && ok "carapace audit routes Mach-O to this scanner" || bad "skill did not route Mach-O"
-$CARA harden "$WORK/mo_soft" >/dev/null 2>&1; [ "$?" -eq 3 ] && ok "harden refuses a Mach-O (rc 3)" || bad "harden did not refuse Mach-O"
+$CARA harden "$WORK/mo_soft" --out "$WORK/mo_soft.hard" >/dev/null 2>&1; [ "$?" -eq 0 ] && ok "harden now dispatches the Mach-O harden chain (Slice Q)" || bad "harden did not run on Mach-O"
 
 hdr "(G) non-Mach-O rejected gracefully"
 make -C "$SAMPLE_DIR" sample_dev >/dev/null 2>&1
