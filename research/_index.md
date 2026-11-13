@@ -9,6 +9,7 @@ Keep it current: one row per note.
 | `findings/2026-10-25-rea-weapons-inventory.md` | rea — per-capability weapons inventory (tools, surfaces, engines, target requirements, runtime-capture path, turnkey severity, popularity, deps/OS; Frida present, PTY path not ptrace) | research | draft (needs Evaluator) | 2026-10-25 |
 | `findings/2026-11-05-competitive-landscape.md` | anti-AI-RE defenders scan (BLA/antirea/AREA) + absorption matrix — what we fold into Carapace and the one scope-change decision | research | draft (needs Evaluator) | 2026-11-05 |
 | `findings/2026-11-11-slice-k-empirical-run.md` | Slice K run for real — measured baseline-vs-hardened on an isolated VM (local `qwen2.5-coder:7b` shell-agent): baseline cracked, hardened not (13.4× tok, 121.9× wall); string-enc/anti-debug/exhaust fired; honeytokens did not; local-model tool-call-parsing gap (rea-via-Codex blocked) | testing | done (measured, N=1) | 2026-11-11 |
+| `findings/2026-11-13-local-model-tool-calling.md` | Local-model tool calling (Slice S): Ollama `message.tool_calls` vs tool JSON in `content` (qwen2.5-coder, Hermes 3, Qwen 3.5 reports); Qwen and gpt-oss native formats; recommendation = native-first + validated text shim + grammar-constrained where supported | research | reviewed | 2026-11-13 |
 
 ## Conventions
 - One note per topic, named `findings/YYYY-MM-DD-<slug>.md`.
