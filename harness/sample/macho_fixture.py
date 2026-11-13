@@ -73,7 +73,8 @@ def _seg64(segname, sections, segflags=0):
     return out
 
 
-def build(path, pie, stack_exec, syms, cstring, signed, restrict, encrypted):
+def build(path, pie, stack_exec, syms, cstring, signed, restrict, encrypted,
+          headerpad=0):
     # ---- decide section layout (offsets filled after we know sizeofcmds) -----
     text = bytes(TEXT)
     cstr = (b"\x00".join(STRINGS) + b"\x00") if cstring else b""
@@ -113,7 +114,11 @@ def build(path, pie, stack_exec, syms, cstring, signed, restrict, encrypted):
     ncmds = len(cmds_sizes)
 
     # ---- concrete file offsets ----------------------------------------------
-    data_start = 32 + sizeofcmds
+    # headerpad: extra zero slack after the load commands and before the first
+    # section data, exactly as a real linker leaves (ld64 default 32 B; more with
+    # -headerpad_max_install_names) so a post-build pass can splice a load command
+    # in place. Default 0 preserves the Slice N/O fixtures byte-for-byte.
+    data_start = 32 + sizeofcmds + headerpad
     text_off = data_start
     cstr_off = text_off + len(text)
     symoff = _align8(cstr_off + len(cstr))
@@ -155,7 +160,7 @@ def build(path, pie, stack_exec, syms, cstring, signed, restrict, encrypted):
                          ncmds, sizeofcmds, flags, 0)
 
     # ---- assemble ------------------------------------------------------------
-    body = bytearray(header + lc + text + cstr)
+    body = bytearray(header + lc + b"\x00" * headerpad + text + cstr)
     body = body.ljust(symoff, b"\x00")
     for i, nm in enumerate(SYMS if syms else []):
         # n_type: N_SECT(0x0e); externals also set N_EXT(0x01) -> 0x0f
@@ -188,8 +193,16 @@ def main(argv=None):
     ap.add_argument("--out", required=True)
     ap.add_argument("--profile", choices=sorted(PROFILES), default="soft")
     ap.add_argument("--fat", action="store_true", help="wrap in a fat/universal container")
+    ap.add_argument("--headerpad", type=int, default=0,
+                    help="bytes of zero header pad after the load commands (room to splice "
+                         "a load command in place; default 0 = Slice N/O behaviour)")
+    ap.add_argument("--signed", action="store_true",
+                    help="force a code signature regardless of profile (for the strip→sign warning)")
     args = ap.parse_args(argv)
-    thin = build(args.out if not args.fat else args.out + ".thin", **PROFILES[args.profile])
+    opts = dict(PROFILES[args.profile], headerpad=args.headerpad)
+    if args.signed:
+        opts["signed"] = True
+    thin = build(args.out if not args.fat else args.out + ".thin", **opts)
     if args.fat:
         build_fat(args.out, thin)
         import os

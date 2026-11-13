@@ -242,6 +242,14 @@ def analyze(path):
     if high_entropy and not packer and not encrypted:
         packer.append("high-entropy (possible packing)")
 
+    # Carapace post-build levers (Slice Q): a decoy non-mapped segment (an added
+    # LC_SEGMENT_64 named __CARAPACE* with vmsize=0, and/or a decoy trailer marker) and
+    # honeytokens in the non-mapped trailer. Detected, never scored — they are
+    # COST/DETECTION, not an exposure change (mirrors the ELF/PE guards line).
+    carapace_segs = [sg for sg, _ in m.segments if sg.startswith("__CARAPACE")]
+    decoy_segment_present = bool(carapace_segs) or (b"__CARAPACE_MACHO_EXH_" in d)
+    honeytokens_present = b"__CARAPACE_MACHO_HONEY__" in d
+
     s = {
         "file": os.path.basename(path),
         "format": ("Mach-O64" if m.is64 else "Mach-O32") + ("-FAT" if m.is_fat else ""),
@@ -262,6 +270,9 @@ def analyze(path):
         "dylibs": [os.path.basename(x) for x in m.dylibs][:16],
         "dylib_count": len(m.dylibs),
         "packer": packer,
+        "decoy_segment_present": decoy_segment_present,
+        "carapace_segment_count": len(carapace_segs),
+        "honeytokens_present": honeytokens_present,
     }
     s["score"], s["tier"], s["recommendation"] = score(s)
     return s
@@ -310,6 +321,16 @@ def recommend(s):
         return ("Strip LOCAL/static symbols (harness/harden/carapace_macho_strip.py, or "
                 "`carapace apply`) and don't ship a companion dSYM — Tier: Speed-bump→Meaningful. "
                 "Bypass: exported names remain (dyld needs them); the agent reasons from behavior.")
+    if not s.get("decoy_segment_present"):
+        return ("Inflate the analysis surface: add a decoy NON-MAPPED segment + trailer "
+                "(harness/harden/carapace_macho_exhaust.py, or `carapace harden`). "
+                "Tier: Trivial→Speed-bump. Bypass: a loader-faithful tool reads only mapped "
+                "segments and drops vmsize==0 LCs + the trailer. COST, not prevention.")
+    if not s.get("honeytokens_present"):
+        return ("Plant honeytokens / canaries in the non-mapped trailer + a PRIVATE ledger "
+                "(harness/harden/carapace_macho_honeytokens.py, or `carapace harden`). "
+                "Tier: Speed-bump (poison) / Meaningful FOR DETECTION (attribution). "
+                "Bypass: xref-validate drops unreferenced tokens; rename the marker for production.")
     if s["string_density"] >= 0.05:
         return ("Encrypt / decode-on-demand high-density plaintext strings "
                 "(see harness/harden/carapace_string_encrypt.py). Tier: Speed-bump→Meaningful. "
@@ -354,6 +375,8 @@ def render(s):
              f"__RESTRICT={yn(h['restrict_segment'])} | __TEXT-encrypted={yn(h['encrypted'])}")
     L.append(f"    code signature present (READ-ONLY, not verified): {yn(s['code_signature_present'])}")
     L.append(f"    build UUID present: {yn(s['uuid_present'])}")
+    L.append(f"    Carapace levers ........ decoy-segment={yn(s.get('decoy_segment_present', False))}; "
+             f"honeytokens={yn(s.get('honeytokens_present', False))}  (post-build; COST/DETECTION, not scored)")
     L.append("")
     L.append("  Exposure drivers:")
     for r in s["recommendation"]["exposure_drivers"]:
