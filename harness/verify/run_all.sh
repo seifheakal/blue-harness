@@ -27,8 +27,9 @@ declare -A WHAT=(
     [p]="PE harden path: COFF/debug strip + decoy non-mapped overlay + honeytokens, surgical"
     [q]="Mach-O harden depth: decoy non-mapped segment (vmsize=0 LC) + honeytokens, surgical"
     [r]="mobile-container reach: unpack APK/IPA, audit + harden native payloads, repack (honest re-sign)"
+    [s]="Slice-K re-run packaged: one-command scored run + tool-call shim, proven with a MOCK attacker"
 )
-ORDER="a b c d e f g h i j k l m n o p q r"
+ORDER="a b c d e f g h i j k l m n o p q r s"
 
 echo "=================================================================="
 echo "  Carapace — measure it, harden it, PROVE it"

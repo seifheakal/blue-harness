@@ -5,7 +5,7 @@
 > pass work between chats without dumping context. Keep it short and current.
 
 - Last updated: 2026-11-13
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–R ✅) → Testing ✅ (265 + Slice Q's 39 + Slice R's 26 = **330/330** via `make verify`, enforced in CI) → all three native formats audited; ELF/PE/Mach-O all have a post-build harden path (Mach-O now at depth — strip + decoy segment + honeytokens); mobile containers (APK/AAB/IPA) reach into their native payloads too; open items are operator decisions (below)**
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–S ✅) → Testing ✅ (265 + Q 39 + R 26 + S 23 = **353/353** via `make verify`, enforced in CI) → all three native formats audited; ELF/PE/Mach-O all have a post-build harden path (Mach-O at depth — strip + decoy segment + honeytokens); mobile containers (APK/AAB/IPA) reach into their native payloads; the empirical re-run is a one-command, scored, operator-runnable procedure (Slice S); open items are operator decisions (below)**
 - **2026-11-13 — Slice R (mobile-container reach):** the harness unpacks an APK/AAB/
   IPA (all ZIP), enumerates the **native** payloads (Android `lib/<abi>/*.so` → ELF;
   iOS app binary + Frameworks + `*.dylib` → Mach-O), audits each via the existing
@@ -456,6 +456,43 @@
     *container reach* itself is cross-platform (pure-Python ZIP). Research +
     analysis: `research/findings/2026-11-13-mobile-container-reach.md`,
     `docs/re-techniques/mobile-containers.md`.
+- **Implementation — Slice S ✅ (Slice-K re-run harness: one command + the tool-call
+  fix; +23 CI checks).** Turns the parked, manual empirical run into a packaged,
+  scored, operator-runnable procedure, and fixes the friction that blocked the
+  2026-11-11 run:
+  - **Agent + friction fix:** `harness/measure/attacker_agent.py` — a minimal
+    ReAct loop, a real shell-tool executor (60 s/8 KB caps, as the 2026-11-11 custom
+    loop), and pluggable backends. `extract_tool_calls()` is the fix: it prefers a
+    model's native `tool_calls` and, for commodity local models that emit calls as
+    **plain JSON text** (the exact shape Codex+Ollama dropped on 2026-11-11), parses
+    them with a string-aware brace matcher, accepting only declared tool names and
+    never parsing tool OUTPUT (injection-safe). Backends: `OllamaBackend` (the
+    operator's local model; downloads nothing, only POSTs to an endpoint) and
+    `MockBackend` (a deterministic scripted brain over the REAL tools, for CI).
+  - **One command:** `harness/measure/slice_k_run.py` + `make slice-k-run MODEL=…
+    TARGET=…` — builds the sealed pair, drives the agent against baseline AND
+    hardened, emits `run_*.json`, and scores via the existing `rea_measure.py`.
+    `make slice-k-run-mock` runs the whole pipeline with no model/network/VM.
+  - **Slice J wired + scorer:** the hardened run now reaches and surfaces a
+    honeytoken; `rea_measure.py` records the **attribution** in the before/after
+    (`honeytoken_attributions`) and still scores the decoy *not cracked* — the path
+    the 7B run never reached. Scorer also carries a `measurement_grade`: a mock
+    report is loudly `*** NOT A MEASUREMENT ***` and refuses to show a cost number.
+  - **Research:** `research/findings/2026-11-13-local-model-tool-calling.md` (cited):
+    the JSON-as-text failure is a widely-reported 2026 Ollama issue; the robust path
+    is layered (native → text-extraction shim → grammar-constrained where supported).
+  - **Verify:** `harness/verify/test_slice_s.sh` (**23/23 on CI**; 12 run anywhere +
+    11 build-gated to Linux/ELF) — the shim parses the 2026-11-11 case + variants and
+    drops unknown/injected calls; the MOCK pipeline runs end-to-end (baseline CRACKED
+    vs seal, hardened NOT, honeytoken surfaced + attributed); honesty guardrails fire
+    (NOT-A-MEASUREMENT, no fabricated multiplier, VM-gating stated); the live Ollama
+    path is wired (proven statically via `--dry-run`, contacts nothing).
+  - **Honest limit / tier:** this PACKAGES the measurement and fixes the tooling; it
+    does **not** produce an effectiveness number — that still needs the operator's
+    isolated VM + chosen model + hardware (same gating as the Slice K VM note). The
+    friction fix is a *Speed-bump remover for the attacker's tooling*, not a defense;
+    bypass: a reliably-tool-calling model or grammar-constrained decoding makes the
+    shim unnecessary (which is fine — the point is to let the re-run happen at all).
 
 ## Status: absorption plan complete
 Every in-scope idea from the competitive scan is now folded in and
@@ -473,7 +510,10 @@ are **operator decisions / operator-gated actions**, not pending build work.
    (agent blocked upstream); the agent was a **custom shell loop, not `rea`-via-
    Codex** — commodity local models emit tool calls as unparsed JSON text (Codex +
    Ollama both drop them), a P0-relevant friction finding. Detail + caveats:
-   `research/findings/2026-11-11-slice-k-empirical-run.md`.
+   `research/findings/2026-11-11-slice-k-empirical-run.md`. **Slice S (2026-11-13)
+   then PACKAGED this re-run** into one scored command (`make slice-k-run`) and
+   fixed that tool-call friction with a robust shim, so the run no longer needs a
+   throwaway custom loop; the actual *measured* numbers still need the operator VM.
 2. **Scope expansion** (the one real fork): native/mobile vs. adding Electron/JS/
    Wasm/.NET = a **CLAUDE.md §2 change**. Recommendation unchanged: keep the
    mechanism-proven native core; add a web/bundle track only as an explicit,
@@ -502,6 +542,10 @@ are **operator decisions / operator-gated actions**, not pending build work.
   `research/findings/2026-11-11-slice-k-empirical-run.md`.
 - **Slice L — one-command `carapace harden` + skill `install`** — ✅ done (UX
   parity with `npx … harden .`, without faking build-time guards).
+- **Slice S — Slice-K re-run harness (one command + tool-call fix)** — ✅ done: the
+  empirical re-run is now `make slice-k-run`, the JSON-as-text tool-call friction is
+  fixed by a robust shim, Slice J is wired into the loop+scorer, and the pipeline is
+  CI-proven with a MOCK attacker (23/23). Measured numbers stay operator-VM-gated.
 - **PE/Mach-O reach** — ✅ done: PE dispatch (Slice M) + Mach-O audit (Slice N) +
   Mach-O strip (Slice O) + **PE harden (Slice P)** + **Mach-O harden depth (Slice Q:
   decoy non-mapped segment + honeytokens)**; the skill auto-detects ELF/PE/Mach-O and
@@ -516,17 +560,21 @@ are **operator decisions / operator-gated actions**, not pending build work.
   style) — relies on a cooperative model; violates CLAUDE.md §2. Never scored.
 
 ## Parked / needs operator action
-- The Slice K run (2026-11-11) used a **custom shell-agent**, not `rea` itself,
-  because commodity local models could not drive the `rea` MCP via Codex (tool
-  calls emitted as unparsed JSON text). So the deep `rea`-internals questions
+- **The empirical re-run is now PACKAGED, not manual (Slice S, 2026-11-13).** It is
+  one scored command — `make slice-k-run MODEL=… TARGET=…` — and the tool-call
+  friction that forced the 2026-11-11 custom loop is fixed (a robust shim parses the
+  JSON-as-text calls; native `tool_calls` preferred). The honeytoken poison/
+  attribution path (Slice J) is wired into the loop + scorer, and the pipeline is
+  CI-proven with a deterministic MOCK attacker (`harness/verify/test_slice_s.sh`,
+  `make slice-k-run-mock`). **What is still operator-gated:** the actual *measured*
+  numbers, which need the operator's isolated VM + chosen model + hardware — we
+  never fabricate them. A stronger / reliably tool-calling model (e.g. Codex-native
+  `gpt-oss`, or `rea` itself) is still the way to drive the agent far enough to
+  actually trip Slice J and the decompiler path; the deep `rea`-internals questions
   (authoritative `tools/list`, Frida-script screening, GDB/MI reality, stripped
-  decompile) remain open, as does a re-run with a reliably tool-calling model
-  (e.g. Codex-native `gpt-oss`) and/or `rea` itself to exercise Slice J + the
-  decompiler path. Nothing is blocked on it. **As of 2026-11-12 this re-run is
-  publicly solicited** in the README (red top box) and `docs/HOW-WE-TESTED.md` —
-  anyone with the hardware can run it against a bigger model and PR the scored
-  result; a stronger, reliably tool-calling attacker is the only way to exercise
-  the honeytoken poison/attribution path, which the 7B run never reached.
+  decompile) remain open but nothing is blocked on them. Still **publicly solicited**
+  in the README (red top box) and `docs/HOW-WE-TESTED.md` — now pointing at the
+  one-command path.
 - P0 entries still `list (verify in research)`: `disasm-mcp`+`agentic-re` are in
   analysis (via `rea.md`); the rest await their own research passes.
 

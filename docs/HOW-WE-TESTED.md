@@ -34,7 +34,7 @@ before/after diff:
 Run it:
 
 ```bash
-make verify     # every slice test, one posture summary → 304/304
+make verify     # every slice test, one posture summary → 353/353
 make demo       # audit a sample build, show its plan, then prove every defense fires
 ```
 
@@ -100,30 +100,32 @@ blocked upstream before it could reach, and be fooled by, a decoy. Full writeup
 with the defenses-firing transcript and every caveat:
 [`research/findings/2026-11-11-slice-k-empirical-run.md`](../research/findings/2026-11-11-slice-k-empirical-run.md).
 
-### Reproduce it
+### Reproduce it — now one command
 
-Follow the [runbook](workflow/slice-k-empirical-runbook.md) for the canonical,
-agent-agnostic steps. In short:
+Since Slice S the whole loop is packaged. Inside your isolated, operator-owned VM,
+with your own model served (e.g. by Ollama) and your flag in the environment:
 
 ```bash
-# 1. Build the matched pair on your scoring box (your flag never enters the repo)
-export CARAPACE_CRACKME_SECRET='CARA{your-own-flag}'
-bash harness/crackme/build_crackme.sh          # → harness/crackme/build/
-
-# 2. Copy ONLY these into your isolated VM (never the honey-ledger):
-#    crackme_baseline, crackme_hardened, SEAL.json
-
-# 3. In the VM, point your agent at each binary in a FRESH context with the SAME
-#    one-sentence task; record tokens, wall_clock_s, recovered_secret, transcript.
-
-# 4. Score on the host — a crack counts only if it hashes to the seal:
-python3 harness/measure/rea_measure.py \
-    --seal   harness/crackme/build/SEAL.json \
-    --ledger harness/crackme/build/crackme_hardened.honey-ledger.json \
-    --baseline run_baseline.json --hardened run_hardened.json
+export CARAPACE_CRACKME_SECRET='CARA{your-own-flag}'   # never enters the repo
+make slice-k-run MODEL=<your-model> TARGET=http://127.0.0.1:11434
 ```
 
-Plumbing proof (no agent, no VM): `bash harness/verify/test_slice_k.sh`.
+That builds the sealed pair, drives an attacker agent against **both** builds, and
+prints the honest before/after. The driver (`harness/measure/slice_k_run.py` +
+`attacker_agent.py`) fixes the friction that blocked the 2026-11-11 run: it prefers
+a model's native `tool_calls` and, for commodity local models that emit tool calls
+as **plain JSON text**, a robust shim parses them anyway (see
+[`research/findings/2026-11-13-local-model-tool-calling.md`](../research/findings/2026-11-13-local-model-tool-calling.md)).
+It downloads no model; `TARGET` is just the endpoint you point it at.
+
+The manual, agent-agnostic path still works and is documented in the
+[runbook](workflow/slice-k-empirical-runbook.md) (build → copy ONLY
+`crackme_baseline`/`crackme_hardened`/`SEAL.json` into the VM — never the
+honey-ledger → run → score with `harness/measure/rea_measure.py`).
+
+Prove the whole pipeline with **no model, no network, no VM** (a deterministic MOCK
+attacker, loudly marked *not a measurement*): `make slice-k-run-mock`. Plumbing
+proofs: `bash harness/verify/test_slice_k.sh` and `bash harness/verify/test_slice_s.sh`.
 
 ---
 
@@ -136,12 +138,16 @@ genuinely valuable if someone ran it. Concretely:
 - **Swap in a bigger / better model.** More VRAM (a bigger card, multi-GPU, or a
   cloud GPU) lets you run a 32B–70B coder, or a hosted frontier model. Point the
   agent at it and keep everything else identical.
-- **Prefer a reliably tool-calling model so you can use the real `rea` MCP.** A
-  model whose agentic tool-calling actually parses (e.g. the Codex-native
-  `gpt-oss`) closes the gap that forced our custom loop, and lets the agent reach
-  the **decompiler path** and the **string/secret-reporting stage** — which is the
-  only way to finally **exercise Slice J (honeytokens)**, the one layer our run
-  never triggered.
+- **Reach the honeytoken layer.** Slice J (honeytokens) only fires once the agent
+  gets far enough to mine and *report* a string it believes is the secret — which
+  our 7B never did (it was blocked upstream). The packaged driver removes the
+  tool-call friction (native `tool_calls` first, a JSON-text shim as fallback), so a
+  commodity local model can now drive the loop at all; a stronger / reliably
+  tool-calling model (e.g. the Codex-native `gpt-oss`, or `rea` itself) reaches the
+  decompiler and string-reporting stage where Slice J finally gets exercised. When
+  it does, the scorer attributes the surfaced decoy to the exact build (via the
+  private ledger) and still scores it **not cracked** — a honeytoken is poison, not
+  a find.
 - **Keep the scoring honest.** Use the same scorer: a crack counts only if the
   recovered string **hashes to `SEAL.json`**; leave unreported tokens/wall as
   `null` (they print *not measured*), never estimate.
