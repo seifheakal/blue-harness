@@ -384,9 +384,25 @@ are **operator decisions / operator-gated actions**, not pending build work.
    Ollama both drop them), a P0-relevant friction finding. Detail + caveats:
    `research/findings/2026-11-11-slice-k-empirical-run.md`.
 2. **Scope expansion** (the one real fork): native/mobile vs. adding Electron/JS/
-   Wasm/.NET = a **CLAUDE.md §2 change**. Recommendation unchanged: keep the
-   mechanism-proven native core; add a web/bundle track only as an explicit,
-   separately-tiered second track, never silently. Confirm before any such work.
+   Wasm/.NET = a **CLAUDE.md §2 change**. **→ Slice T (2026-11-14) turned this into
+   a decision-ready PROPOSAL, now PENDING OPERATOR SIGN-OFF:**
+   `docs/proposals/scope-expansion-web-bundle-track.md`, backed by four cited,
+   dated research notes (`research/findings/2026-11-14-{electron,js-deobf,wasm,
+   dotnet-il}-re-landscape.md`) and reference-only catalog entries
+   (`docs/re-techniques/{electron-asar,js-deobf,wasm-decompile,dotnet-decompile}.md`,
+   NOT worked). Concrete recommendation in the proposal: **(1) adopt now with no §2
+   change** — recognise NativeAOT/IL2CPP *native* output and route it to the
+   existing native audit (the best honest "harden my .NET/Unity app" answer is
+   already in scope), and treat .NET MAUI/Android as a mobile-track (Track B)
+   question; **(2) default: do NOT add a managed/web *harden* track** (nothing
+   client-side there honestly beats Speed-bump, there is no mechanism-proof story,
+   and the only Strong lever — server-side relocation — is what we already say);
+   **(3) conditional yes** to a *narrow, audit-first, separately-tiered* web/bundle
+   exposure audit **only if the operator's own target ships one of these formats**,
+   never counted toward the mechanism-proven posture guarantee. Exposure ranking
+   from the research: managed-IL ≳ JS ≳ Electron ≫ Wasm ≫ native. **No §2 edit made,
+   no harden/audit code for these formats built** — `CLAUDE.md` §9-style wording is
+   in the proposal as an apply-only-if-approved snippet. Confirm before any such work.
 3. **PE/Mach-O reach** — ✅ DONE. PE dispatch (Slice M) + Mach-O audit (Slice N) +
    Mach-O local-symbol **harden** (Slice O) + **PE harden path** (Slice P: COFF/
    debug strip, decoy non-mapped overlay, honeytokens). All three native formats
