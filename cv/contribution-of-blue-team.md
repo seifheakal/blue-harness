@@ -85,6 +85,39 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 
 ## Contribution Log (append after every bit — newest at top)
 
+### 2026-11-14
+- **Produced Slice T — a decision-ready scope-expansion proposal (research +
+  analysis only; no code, no scope change).** Resolved the project's one standing
+  governance fork — whether to add a second "web/bundle" track (Electron/ASAR, V8
+  bytecode, minified/obfuscated JavaScript, WebAssembly, managed .NET/CIL) alongside
+  the native + mobile core — into a cited, operator-ready recommendation, following
+  the project's research→analysis→proposal pipeline and its CLAUDE.md §3 rule to
+  confirm before any scope-expansion work:
+  - **Ran a parallel, cited landscape study of all four formats** (Lead →
+    four Scout sub-agents → Evaluator sign-off), each dated and honest about
+    unverified sources: `research/findings/2026-11-14-{electron,js-deobf,wasm,
+    dotnet-il}-re-landscape.md`. Centered every format on the Priority-0
+    AI-assisted-RE threat (a non-expert points an LLM-driven MCP/skill at the
+    target) and confirmed off-the-shelf tooling already exists for each
+    (`humanify`, dnSpy-MCP/ILSpy-MCP wrappers, `re-electron`, `webcrack`).
+  - **Established an honest exposure ranking — managed-IL ≳ JS ≳ Electron ≫ Wasm ≫
+    native** — and the load-bearing finding that *no client-side countermeasure for
+    these managed/high-level formats honestly exceeds the Speed-bump tier*, there is
+    *no mechanism-proof "it fired" story* (unlike the native guards), and the only
+    Strong lever is the server-side relocation the project already recommends. Every
+    per-format tier carries a named bypass; every AI-layer tier is flagged unmeasured.
+  - **Surfaced the NativeAOT/IL2CPP insight:** the best honest "harden my .NET/Unity
+    app" answer is to compile to a *native* binary, which folds into the EXISTING
+    native track — no scope change needed — and that .NET MAUI/Android is a
+    mobile-track question, not a web/bundle one.
+  - **Delivered the proposal** (`docs/proposals/scope-expansion-web-bundle-track.md`)
+    with the case for/against, an effort estimate, a concrete recommendation (default
+    no harden track; conditional audit-first track only for a format the operator's
+    target ships; adopt the no-scope-change NativeAOT routing now), a *quoted*
+    CLAUDE.md §2 wording change to apply only if approved (deliberately not applied),
+    and an explicit "Operator decision requested" section. Added four reference-only
+    catalog entries (marked NOT worked) without expanding scope.
+
 ### 2026-11-13
 - **Shipped Implementation Slice Q (Mach-O harden DEPTH — parity with ELF/PE,
   39/39 green; 304/304 across 17 slices).** Mach-O had only the Slice O local-symbol

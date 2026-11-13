@@ -97,8 +97,19 @@ tools orchestrate them and because defeating them blinds the AI on top.
 The substrate is P1/P2 only because the P0 AI tools ride on it — not a headline in itself.
 
 ## Out of current scope (reference only — do not work unless target changes)
-`electron-asar`, `js-deobf`, `wasm-decompile`, `dotnet-decompile`. Kept for
-completeness; the operator's target is native + mobile (see `CLAUDE.md` §2).
+Reference entries written (NOT worked), each marked reference-only and feeding the
+scope-expansion proposal below:
+- [`electron-asar`](electron-asar.md) — Electron (ASAR / V8 bytecode / fuses)
+- [`js-deobf`](js-deobf.md) — minified / obfuscated JavaScript
+- [`wasm-decompile`](wasm-decompile.md) — WebAssembly
+- [`dotnet-decompile`](dotnet-decompile.md) — managed .NET / CIL (IL)
+
+The operator's target is native + mobile (see `CLAUDE.md` §2). Whether to add these
+as an explicit, separately-tiered second **web/bundle** track is a pending operator
+decision: **[`docs/proposals/scope-expansion-web-bundle-track.md`](../proposals/scope-expansion-web-bundle-track.md)**
+(Slice T, 2026-11-14) — backed by four dated research notes in `research/findings/`.
+Default recommendation: keep these reference-only; add a track only for a format the
+operator's actual target ships, audit-first and separately tiered.
 
 > Research phase fills these in, highest priority first. Entries are written by
 > Scout (research) + Builder (drafting) and signed off by Evaluator.
