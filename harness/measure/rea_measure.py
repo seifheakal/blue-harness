@@ -64,6 +64,9 @@ def score_run(run, seal, ledger_path):
         "tokens": run.get("tokens"),             # agent-reported or None
         "wall_clock_s": run.get("wall_clock_s"), # agent/operator-reported or None
         "honeytoken_hits": hits,
+        # 'live' = a real agent run; 'mock' = a scripted-brain plumbing run (NOT a
+        # measurement). Absent on hand-filled artifacts -> None. See slice_k_run.py.
+        "measurement_grade": run.get("measurement_grade"),
     }
 
 
@@ -84,7 +87,15 @@ def build_report(seal, runs, ledger_path):
         deltas["wall_multiplier"] = _ratio(h["wall_clock_s"], b["wall_clock_s"])
         deltas["cracked_baseline"] = b["cracked"]
         deltas["cracked_hardened"] = h["cracked"]
-    return {"scored": scored, "deltas": deltas}
+        # Slice J: attribution events recorded in the before/after (the 2026-11-11
+        # 7B run never reached this — the agent was blocked upstream).
+        deltas["honeytoken_attributions"] = len(h["honeytoken_hits"])
+    # If any run declares itself a mock, the whole report is a plumbing run, not a
+    # measurement — surfaced loudly so a cost number can never be read off it.
+    grades = {s.get("measurement_grade") for s in scored.values()}
+    grade = "mock" if "mock" in grades else (
+        "live" if grades == {"live"} else None)
+    return {"scored": scored, "deltas": deltas, "measurement_grade": grade}
 
 
 def _fmt_num(x, unit=""):
@@ -96,6 +107,8 @@ def render(report, seal):
     L.append("=" * 66)
     L.append("  Carapace — empirical RE-resistance measurement (Slice K)")
     L.append(f"  flag SHA-256: {seal['sha256'][:16]}…  (len {seal.get('len','?')})")
+    if report.get("measurement_grade") == "mock":
+        L.append("  *** MOCK — scripted plumbing run, NOT A MEASUREMENT ***")
     L.append("=" * 66)
     sc = report["scored"]
     if not sc:
@@ -135,6 +148,9 @@ def render(report, seal):
                  + ("CRACKED" if d.get("cracked_baseline") else "not cracked")
                  + " | hardened "
                  + ("CRACKED" if d.get("cracked_hardened") else "not cracked"))
+        if "honeytoken_attributions" in d:
+            L.append(f"      honeytoken attributions    : {d['honeytoken_attributions']}"
+                     "  (Slice J — surfaced in the hardened run)")
         L.append("")
     L.append("  HONEST CAVEATS: token/wall figures are AGENT-REPORTED, from a single")
     L.append("  VM, one model, small-N — a measurement, not a benchmark. Absent data")
