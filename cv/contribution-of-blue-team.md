@@ -85,6 +85,36 @@ defense (Ghidra, IDA, Frida, JADX, Binwalk) · Claude Code multi-agent orchestra
 
 ## Contribution Log (append after every bit — newest at top)
 
+### 2026-11-13
+- **Shipped Implementation Slice S (Slice-K empirical re-run harness — one command +
+  the tool-call fix; +23 CI checks, proven with a deterministic MOCK attacker).**
+  Turned the parked, manual AI-RE measurement into a packaged, scored, operator-
+  runnable procedure, and fixed the P0-relevant friction that blocked the 2026-11-11
+  run:
+  - **Fixed the tool-call friction.** Commodity local models emit tool calls as
+    plain JSON text that Codex/Ollama drop (the 2026-11-11 blocker). Built a robust
+    shim (`attacker_agent.py:extract_tool_calls`) that prefers a model's native
+    `tool_calls` and otherwise parses JSON-as-text with a string-aware brace matcher,
+    accepting only declared tool names and never parsing tool *output*
+    (prompt-injection-safe). Researched + cited the current state of local-model
+    tool calling (`research/findings/2026-11-13-local-model-tool-calling.md`).
+  - **One command.** `make slice-k-run MODEL=… TARGET=…` (+ `slice_k_run.py`) builds
+    the sealed CrackMe pair, drives an attacker agent against baseline AND hardened,
+    and emits the honest before/after via the existing scorer. Pluggable backends:
+    Ollama (the operator's local model — downloads nothing) and a deterministic Mock.
+  - **Exercised Slice J.** Wired the loop + scorer so a stronger attacker trips the
+    honeytoken poison/attribution path (the 7B run never reached it); the scorer
+    records the attribution and still scores the surfaced decoy *not cracked*.
+  - **Proved it green in CI with no model and no VM.** `harness/verify/test_slice_s.sh`
+    (23/23) runs the shim unit tests + the full mock pipeline end-to-end; the output
+    is loudly stamped **NOT A MEASUREMENT** and no cost number is ever fabricated.
+  - **Honest tier + bypass.** This packages the measurement and fixes the tooling; it
+    is **not** itself a defense and produces no effectiveness number — real numbers
+    need the operator's isolated VM + chosen model + hardware. Bypass: a reliably
+    tool-calling model or grammar-constrained decoding makes the shim unnecessary.
+  - (Sibling branches off the same base: Slice Q (Mach-O harden, PR #5) and Slice R
+    (mobile reach, PR #6); each states only its own increment.)
+
 ### 2026-11-12
 - **Shipped Implementation Slice P (Windows PE harden path — the first PE harden,
   42/42 green; 265/265 across 16 slices).** PE was audit-only (Slice G); gave it a

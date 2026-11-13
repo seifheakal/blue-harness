@@ -6,6 +6,35 @@
 > **operator-owned, sandboxed VM**. **Do not install or run offensive tooling in
 > the dev container or CI** (CLAUDE.md §3).
 
+## One command (Slice S) — the fast path
+
+Since Slice S the build→drive→score loop is packaged. **Inside your isolated,
+operator-owned VM**, with your chosen model served locally (e.g. Ollama) and your
+flag in the environment:
+
+```bash
+export CARAPACE_CRACKME_SECRET='CARA{your-own-flag}'   # never enters the repo
+make slice-k-run MODEL=<your-model> TARGET=http://127.0.0.1:11434
+```
+
+It builds the sealed pair, drives the attacker agent
+(`harness/measure/attacker_agent.py`) against **both** builds, and prints the honest
+before/after via the same scorer. **The tool-call friction that blocked the
+2026-11-11 run is fixed**: the driver prefers a model's native `tool_calls` and
+falls back to a robust shim that parses tool calls a commodity local model emits as
+plain JSON text (background + citations:
+`research/findings/2026-11-13-local-model-tool-calling.md`). It downloads no model;
+`TARGET` is only the endpoint you point it at, and this is meant to run in the VM.
+
+> **Honesty.** A real run's numbers require **your** isolated VM, **your** chosen
+> model, and **your** hardware — the same gating class as everything below. We never
+> fabricate numbers; absent figures print as *not measured*. To exercise the whole
+> pipeline with **no model, no network, no VM** (a deterministic MOCK attacker,
+> loudly marked *not a measurement*): `make slice-k-run-mock`.
+
+The manual, agent-agnostic steps below remain canonical — use them for `rea`, a
+hosted model, or any agent the one-command Ollama path doesn't cover.
+
 ## What this measures, and why honestly
 We harden the operator's **own** CrackMe and let an AI-RE agent (e.g. `rea`,
 driven by whatever local/uncensored model the operator chooses) try to recover

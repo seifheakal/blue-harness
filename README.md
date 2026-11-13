@@ -18,7 +18,10 @@
 > model on a laptop (RTX 3070, 8 GB VRAM / 16 GB RAM) — a **floor, not a ceiling**.
 > If you have the hardware, point a **larger local or a frontier model** at the same
 > two builds and **send the scored result back as a PR**. A stronger attacker is the
-> only way to test the layers our small run never reached. Five-minute guide:
+> only way to test the layers our small run never reached. It is now **one command** —
+> `make slice-k-run MODEL=<your-model>` builds the sealed pair, drives the agent, and
+> prints the honest before/after (and we fixed the tool-call friction that blocked
+> commodity local models). Five-minute guide:
 > [**docs/HOW-WE-TESTED.md**](docs/HOW-WE-TESTED.md).
 
 ## Quickstart
@@ -97,9 +100,10 @@ hardening — with its tier and bypass, every time.
   Windows **PE** harden path (COFF/debug strip + decoy non-mapped overlay +
   honeytokens), and a first macOS/iOS pass (local-symbol strip).
 - One-command `harden`, the driving Claude skill, and a **CI gate that re-proves
-  every defense fires on each push** (265 checks green).
-- An empirical harness (digest-sealed CrackMe + honest scorer) and **one measured
-  before/after run**.
+  every defense fires on each push** (288 checks green).
+- An empirical harness (digest-sealed CrackMe + honest scorer), **one measured
+  before/after run**, and a **one-command re-run** (`make slice-k-run`) with a
+  robust tool-call shim so a commodity local model can actually drive it.
 
 **Not done yet**
 - **Deeper build-time hardening for Windows PE** — the post-build path ships (COFF/
@@ -163,10 +167,11 @@ exhaustion, honeytoken poisoning) as its own, mechanism-proven countermeasures. 
 
 **Active.** All three native formats audited with magic-byte dispatch and each with
 a post-build harden path; nine mechanism-proven countermeasures; a one-command
-`harden`; a CI gate with **265/265 checks green**
+`harden`; a CI gate with **288/288 checks green**
 ([`make verify`](.github/workflows/verify.yml) on every push and pull
 request — the badge above is that gate); and a digest-sealed CrackMe with an honest
-empirical scorer. Roadmap in [docs/STATE.md](docs/STATE.md).
+empirical scorer, now driven by a **one-command re-run** (`make slice-k-run`).
+Roadmap in [docs/STATE.md](docs/STATE.md).
 
 ## License
 
