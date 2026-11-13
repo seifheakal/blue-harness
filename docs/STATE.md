@@ -4,8 +4,15 @@
 > at the start and **updates it at the end** before handing off. This is how we
 > pass work between chats without dumping context. Keep it short and current.
 
-- Last updated: 2026-11-12
-- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–P ✅) → Testing ✅ (265/265 via `make verify`, enforced in CI) → all three native formats audited; ELF/PE/Mach-O all have a post-build harden path; open items are operator decisions (below)**
+- Last updated: 2026-11-13
+- Phase: **Research ✅ → Analysis ✅ → Implementation (Slices A–P ✅, R ✅) → Testing ✅ (this branch: 265 + Slice R's 26 = **291/291** via `make verify`; Slice Q's +39 lands separately via PR #5) → all three native formats audited + post-build harden; now **mobile containers (APK/AAB/IPA) reach into their native payloads too**; open items are operator decisions (below)**
+- **2026-11-13 — Slice R (mobile-container reach):** the harness unpacks an APK/AAB/
+  IPA (all ZIP), enumerates the **native** payloads (Android `lib/<abi>/*.so` → ELF;
+  iOS app binary + Frameworks + `*.dylib` → Mach-O), audits each via the existing
+  per-format auditor, and **hardens by dispatching through the stable Slice-M entry
+  point + repacking** (no lever hard-coded → auto-picks-up Slice Q once merged). DEX/
+  managed code is out of scope (CLAUDE.md §2). Honest signing limit stated, never
+  faked. Session 2 of 4 (sibling: Slice Q Mach-O harden, PR #5).
 - Competitive scan done (2026-11-05): `research/findings/2026-11-05-competitive-landscape.md`
   — peers now defend against AI-RE (BLA ~2.3k★ the serious one). Operator decision:
   **absorb their good ideas into Carapace** ("engulf"), keeping our native-depth +
@@ -366,6 +373,50 @@
     Speed-bump→Meaningful; exhaust Trivial→Speed-bump; honeytokens Speed-bump /
     Meaningful for DETECTION — each with a named bypass.
 
+- **Implementation — Slice R ✅ (mobile-container reach — APK/AAB/IPA; this
+  branch: 291/291 across 17 slices = 265 + 26; Slice Q's +39 via PR #5).** Teaches
+  the harness to reach INTO a mobile container and apply the EXISTING per-format
+  native hardeners to the payloads inside. Native payloads only (DEX/managed code
+  is a separate track, out of scope):
+  - **Audit:** `harness/audit/mobile_container_audit.py` — classifies APK/AAB/IPA
+    (all ZIP) by marker members, enumerates native payloads by path **+ magic byte**
+    (Android `lib/<abi>/*.so` → ELF; iOS `Payload/*.app` binary + `Frameworks/
+    *.framework/*` + `*.dylib` → Mach-O), and **delegates** each to the existing ELF
+    (`elf_exposure_audit`) / Mach-O (`macho_exposure_audit`, Slice N) auditor for a
+    per-payload scored posture. Read-only, pure-Python → cross-platform.
+    `make audit-mobile BIN=…`.
+  - **Harden:** `harness/harden/carapace_mobile.py` — for each payload, dispatch
+    through the **stable Slice-M format entry point** (`skill/carapace.py harden`,
+    rc-3 fallback to `apply`) so it uses whatever each format hardener offers and
+    **auto-picks-up new levers once merged** (e.g. Slice Q's Mach-O decoy/
+    honeytokens) — **no lever hard-coded**. Collects the PRIVATE map/ledger sidecars
+    **outside** the container; repacks. `make harden-mobile|harden-apk|harden-ipa`.
+  - **Skill:** Slice-M magic-byte dispatch extended — a ZIP (`PK`) routes `audit`/
+    `report`/`recommend`/`harden` to the mobile tools; `apply` on a container points
+    at `harden`; a non-mobile ZIP is refused cleanly (rc 2, no traceback).
+  - **Honest signing limitation (NEVER faked):** repacking invalidates the APK/IPA
+    signature — the tool + the verify say the **operator re-signs** (apksigner /
+    codesign + provisioning) and that on-device integrity ultimately rests on the
+    **platform verifying the signature**, which a client harness cannot provide or
+    fake (CLAUDE.md §3). Tiers are **inherited** from the delegated ELF/Mach-O
+    passes; the container layer adds **no** strength of its own (bypass: the ZIP is
+    not a barrier — re-unpack the repack).
+  - **Fixture:** `harness/sample/elf_so_fixture.py` — toolchain-free minimal ELF64
+    AArch64 `.so` (the Android arm64 shape), parallel to `macho_fixture.py`/
+    `pe_fixture.py`.
+  - **Verify:** `harness/verify/test_slice_r.sh` (**26/26 on CI**, 21 cross-platform
+    + 5 ELF-gated) — enumeration delegates correctly (score parity vs the standalone
+    auditors), DEX/resources skipped, skill routes containers, non-mobile ZIP
+    refused; harden **dispatches + repacks** (IPA/Mach-O cross-platform; APK/ELF
+    gated on ELF binutils, like the bare-ELF slices) with payloads transformed,
+    resources byte-identical, sidecars kept OUT, signing limitation + tier + bypass
+    asserted, and **no false signing claim**.
+  - **Honest limit:** the Mach-O harden path is structural/byte-level (no macOS
+    host, like Slice O); the ELF-payload harden needs ELF binutils (CI/Linux) — the
+    *container reach* itself is cross-platform (pure-Python ZIP). Research +
+    analysis: `research/findings/2026-11-13-mobile-container-reach.md`,
+    `docs/re-techniques/mobile-containers.md`.
+
 ## Status: absorption plan complete
 Every in-scope idea from the competitive scan is now folded in and
 mechanism-proven: **I** (exhaust), **J** (poison/honeytokens), **K** (empirical
@@ -391,9 +442,13 @@ are **operator decisions / operator-gated actions**, not pending build work.
    Mach-O local-symbol **harden** (Slice O) + **PE harden path** (Slice P: COFF/
    debug strip, decoy non-mapped overlay, honeytokens). All three native formats
    are audited and auto-detected, and **ELF, PE and Mach-O all have a post-build
-   harden path**. Possible future increments (in-scope, no VM): more Mach-O harden
-   (decoy/exhaust/honeytokens as added segments — trickier than ELF, needs care
-   without a macOS host to verify), and mobile-container reach (APK `.so` / iOS).
+   harden path**, and **mobile containers (APK/AAB/IPA) now reach into their native
+   payloads too** — ✅ DONE (Slice R, 2026-11-13): unpack + enumerate + delegate-
+   audit + dispatch-harden + repack, with the honest re-sign limitation (operator
+   re-signs; the platform verifies the signature). Possible future increments
+   (in-scope, no VM): more Mach-O harden depth is Slice Q (PR #5, sibling session) —
+   once it merges, Slice R's mobile harden picks it up automatically (it calls the
+   stable per-format entry point, no lever hard-coded).
    None pressing; raise with the operator before starting. **PE and Mach-O runtime
    verification is platform-gated to a Windows / macOS host respectively** (same
    class of gating as open item 1's VM — the harness proves the transforms
@@ -410,8 +465,13 @@ are **operator decisions / operator-gated actions**, not pending build work.
   parity with `npx … harden .`, without faking build-time guards).
 - **PE/Mach-O reach** — ✅ done: PE dispatch (Slice M) + Mach-O audit (Slice N) +
   Mach-O harden (Slice O) + **PE harden (Slice P)**; the skill auto-detects
-  ELF/PE/Mach-O and all three have a post-build harden path. Remaining future
-  increments: more Mach-O harden (added segments) + mobile-container reach.
+  ELF/PE/Mach-O and all three have a post-build harden path.
+- **Mobile-container reach** — ✅ done (**Slice R**, 2026-11-13): the skill also
+  auto-detects an APK/AAB/IPA (ZIP), enumerates the native payloads inside (ELF
+  `.so` / Mach-O), audits each via the per-format auditor, and hardens by
+  dispatching through the stable per-format entry point + repacking (operator
+  re-signs — stated, never faked). Remaining future increment: more Mach-O harden
+  depth (Slice Q, PR #5) — picked up automatically by Slice R once merged.
 - **REJECTED as a defense:** instruction-file barriers / terminal shims (antirea
   style) — relies on a cooperative model; violates CLAUDE.md §2. Never scored.
 

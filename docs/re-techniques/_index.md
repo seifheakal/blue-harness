@@ -84,6 +84,7 @@ tools orchestrate them and because defeating them blinds the AI on top.
 | `ghidra` | Ghidra decompiler | A | static | P1 | todo |
 | `debuggers` | GDB / LLDB / x64dbg / WinDbg | A | dynamic | P2 | todo |
 | `ida` | IDA Pro / Hex-Rays | A | static | P2 | todo |
+| `mobile-containers` | APK/AAB/IPA unpack → reverse native payloads (`.so` / Mach-O) | B | mobile | P1 | **analysis** → [`mobile-containers.md`](mobile-containers.md) (Slice R: native-payload reach) |
 | `jadx-apktool` | JADX / APKTool (Android dex) | B | mobile | P1 | todo |
 | `android-root-hook` | Magisk / Zygisk / Xposed / LSPosed | B | mobile | P2 | todo |
 | `ios-decrypt` | class-dump / app decrypt / Hopper (iOS) | B | mobile | P2 | todo |
