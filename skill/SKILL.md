@@ -31,8 +31,9 @@ python3 skill/carapace.py install    [--user|--dir DIR]    # symlink the skill i
    - **PE** — `apply` (COFF-symbol + debug/PDB strip) and `harden` (strip → decoy
      non-mapped overlay → honeytokens). Proven structurally on Linux; runtime-
      identical needs a Windows host to confirm.
-   - **Mach-O** — `apply` (local-symbol strip); `harden` full-chain is ELF/PE only.
-     Runtime-identical needs a macOS host to confirm.
+   - **Mach-O** — `apply` (local-symbol strip) and `harden` (strip → decoy
+     non-mapped segment + trailer → honeytokens). Proven structurally on Linux;
+     runtime-identical + real-dyld acceptance of the decoy segment need a macOS host.
    An unsupported format is **refused** rather than mangled.
 
 1. **Audit.** Run `carapace audit <binary>`. It reports the exposure score, the

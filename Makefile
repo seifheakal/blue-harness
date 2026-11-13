@@ -44,7 +44,7 @@ harden-pe:
 	@python3 skill/carapace.py harden "$(BIN)"
 
 harden-macho:
-	@python3 harness/harden/carapace_macho_strip.py --in "$(BIN)" --out "$(BIN).stripped"
+	@python3 skill/carapace.py harden "$(BIN)"
 
 install-skill:
 	@python3 skill/carapace.py install
@@ -65,7 +65,8 @@ help:
 	@echo "  make report   BIN=<elf>   full audit + the ordered hardening plan"
 	@echo "  make harden   BIN=<elf>   one command: apply every post-build hardening (honest)"
 	@echo "  make harden-pe BIN=<exe>  PE harden: COFF/debug strip + decoy overlay + honeytokens"
-	@echo "  make harden-macho BIN=<o> strip LOCAL symbols from a Mach-O (strip -x equivalent)"
+	@echo "  make harden-macho BIN=<o> Mach-O harden: local-symbol strip + decoy non-mapped"
+	@echo "                            segment + honeytokens (honest)"
 	@echo "  make install-skill        symlink the skill into .claude/skills/carapace"
 	@echo "  make clean    remove build artifacts"
 	@echo

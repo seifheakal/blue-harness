@@ -38,6 +38,8 @@ TRANSFORM = os.path.join(HARDEN_DIR, "carapace_identity_transform.py")
 EXHAUST = os.path.join(HARDEN_DIR, "carapace_exhaust.py")
 HONEY = os.path.join(HARDEN_DIR, "carapace_honeytokens.py")
 MACHO_STRIP = os.path.join(HARDEN_DIR, "carapace_macho_strip.py")
+MACHO_EXHAUST = os.path.join(HARDEN_DIR, "carapace_macho_exhaust.py")
+MACHO_HONEY = os.path.join(HARDEN_DIR, "carapace_macho_honeytokens.py")
 PE_STRIP = os.path.join(HARDEN_DIR, "carapace_pe_strip.py")
 PE_EXHAUST = os.path.join(HARDEN_DIR, "carapace_pe_exhaust.py")
 PE_HONEY = os.path.join(HARDEN_DIR, "carapace_pe_honeytokens.py")
@@ -512,6 +514,103 @@ def _harden_pe(args, binary):
     return 0
 
 
+def _harden_macho(args, binary):
+    """Mach-O one-command harden: chain the post-build passes (LOCAL-symbol strip →
+    decoy non-mapped segment + trailer → honeytokens), then honestly list the build-time
+    levers that still need a rebuild. Never fakes a build-time guard onto a built Mach-O;
+    mirrors the ELF/PE harden, Mach-O-flavoured. Structural — runtime-identical + real-dyld
+    acceptance need a macOS host (CLAUDE.md §3)."""
+    import tempfile
+    import shutil as _sh
+    m = _macho_audit()
+    out = args.out or (binary + ".hardened")
+    s = m.analyze(binary)
+
+    tmpd = tempfile.mkdtemp(prefix="carapace_macho_harden_")
+    cur = os.path.join(tmpd, "stage0")
+    _sh.copy2(binary, cur)
+    stage = 0
+
+    def _next():
+        nonlocal stage
+        stage += 1
+        return os.path.join(tmpd, f"stage{stage}")
+
+    def _run_pass(cmd):
+        r = subprocess.run(cmd, capture_output=True, text=True)
+        if r.returncode != 0:
+            sys.stderr.write(r.stderr or r.stdout)
+            raise RuntimeError("hardening pass failed")
+        return r.stdout
+
+    applied = []
+    try:
+        if s["symbols_present"]:
+            nf = _next()
+            _run_pass(["python3", MACHO_STRIP, "--in", cur, "--out", nf])
+            cur = nf
+            applied.append(("LOCAL-symbol strip (strip -x equivalent)",
+                            "Speed-bump→Meaningful",
+                            "external/exported names remain (dyld needs them); behaviour recoverable",
+                            "surgical in-place strip (size stable)"))
+
+        if not m.analyze(cur)["decoy_segment_present"]:
+            nf = _next()
+            _run_pass(["python3", MACHO_EXHAUST, cur, nf,
+                       "--regions", "4", "--region-size", "131072"])
+            cur = nf
+            applied.append(("analysis-surface exhaustion (decoy non-mapped segment + trailer)",
+                            "Trivial→Speed-bump",
+                            "a loader-faithful tool reads only mapped segments + drops vmsize==0 LCs/trailer",
+                            "added LC_SEGMENT_64 (vmsize=0) + non-mapped decoy trailer"))
+
+        if not m.analyze(cur)["honeytokens_present"]:
+            nf = _next()
+            ledger = out + ".honey-ledger.json"
+            _run_pass(["python3", MACHO_HONEY, "plant", cur, nf,
+                       "--ledger", ledger, "--count", "10", "--build-tag", args.build_tag])
+            cur = nf
+            applied.append(("honeytokens / canaries (non-mapped trailer)",
+                            "Speed-bump (poison) / Meaningful for DETECTION",
+                            "xref-validate drops unreferenced tokens; rename the tell-tale marker",
+                            f"PRIVATE ledger → {_rel(ledger)}"))
+
+        _sh.copy2(cur, out)
+    except RuntimeError:
+        _sh.rmtree(tmpd, ignore_errors=True)
+        return 1
+    finally:
+        _sh.rmtree(tmpd, ignore_errors=True)
+
+    print(f"Carapace harden (Mach-O) — {_rel(binary)} → {_rel(out)}")
+    print(f"  exposure score {s['score']}/100 → (re-audit {_rel(out)} to see the new posture)")
+    print()
+    print(f"  APPLIED (post-build, {len(applied)}):")
+    for t, tier, byp, art in applied:
+        print(f"    ✓ {t}")
+        print(f"        tier   : {tier}")
+        print(f"        bypass : {byp}")
+        print(f"        artifact: {art}")
+    if not applied:
+        print("    (nothing post-build applied — already hardened, or no symbols)")
+    print()
+    print("  NOT APPLIED — build-time, needs a relink/rebuild from source:")
+    print("    • Build with -fPIE -pie + mark __RESTRICT  [raises exploitation effort; NOT a")
+    print("        decompilation blocker]")
+    print("    • Encrypt live __cstring strings + decode on demand (ELF codegen today;")
+    print("        Mach-O codegen is future work)  [Speed-bump→Meaningful; bypass: runtime key recovery]")
+    print("    • Code-sign AND verify at runtime server-side  [Meaningful only WITH the server")
+    print("        check — a signature on disk is read, not verified, by an RE agent]")
+    print()
+    print("  THE ONLY STRONG TIER: relocate secrets & trust decisions server-side (CLAUDE.md §3).")
+    print()
+    print("  Keep every PRIVATE ledger OUT of the shipped artifact — it is the key.")
+    print("  Honest footer: nothing here is unbreakable — anti-RE only raises the attacker's cost.")
+    print("  Post-build passes are COST/DETECTION; runtime-identical + real-dyld acceptance of the")
+    print("  decoy segment need a macOS host to confirm (structural proof only).")
+    return 0
+
+
 def cmd_harden(args):
     """One command: audit, then apply EVERY applicable POST-BUILD hardening in a
     safe order, and honestly list the build-time ones that still need a rebuild.
@@ -523,9 +622,10 @@ def cmd_harden(args):
     fmt = _detect_format(binary)
     if fmt == "pe":
         return _harden_pe(args, binary)
+    if fmt == "macho":
+        return _harden_macho(args, binary)
     if fmt != "elf":
-        print(f"carapace: harden targets ELF/PE; {_rel(binary)} is {fmt.upper()}.")
-        print("  The post-build passes are ELF/PE today (Mach-O has apply = local-symbol strip);")
+        print(f"carapace: harden targets ELF/PE/Mach-O; {_rel(binary)} is {fmt.upper()}.")
         print("  run `carapace audit` for the read-only posture, and keep secrets server-side.")
         return 3
     out = args.out or (binary + ".hardened")
