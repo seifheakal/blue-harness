@@ -24,15 +24,23 @@ python3 skill/carapace.py install    [--user|--dir DIR]    # symlink the skill i
 ## The loop (audit-first — never skip the audit)
 
    The front door **auto-detects the format by magic byte**: `audit`/`report`/
-   `recommend` route a **Linux ELF**, a **Windows PE**, or a **macOS/iOS Mach-O**
-   to the right scanner (an unrecognized file errors cleanly). Post-build harden
-   coverage per format:
+   `recommend` route a **Linux ELF**, a **Windows PE**, a **macOS/iOS Mach-O**, or
+   a **mobile container** (Android APK/AAB, iOS IPA — all ZIP) to the right scanner
+   (an unrecognized file errors cleanly). Post-build harden coverage per format:
    - **ELF** — `apply` (identity transform) and `harden` (full post-build chain).
    - **PE** — `apply` (COFF-symbol + debug/PDB strip) and `harden` (strip → decoy
      non-mapped overlay → honeytokens). Proven structurally on Linux; runtime-
      identical needs a Windows host to confirm.
    - **Mach-O** — `apply` (local-symbol strip); `harden` full-chain is ELF/PE only.
      Runtime-identical needs a macOS host to confirm.
+   - **Mobile container (APK/AAB/IPA)** — `audit` enumerates the NATIVE payloads
+     inside (Android `lib/<abi>/*.so` → ELF; iOS app binary + Frameworks + `*.dylib`
+     → Mach-O) and delegates each to the per-format auditor; `harden` dispatches
+     each payload through the per-format hardener above and **repacks**. DEX/managed
+     code is a separate track (out of scope). **Honest limit:** repacking
+     invalidates the APK/IPA signature — the operator re-signs (apksigner /
+     codesign); Carapace does **not** sign and does not fake it, and on-device
+     integrity ultimately rests on the platform verifying that signature.
    An unsupported format is **refused** rather than mangled.
 
 1. **Audit.** Run `carapace audit <binary>`. It reports the exposure score, the
