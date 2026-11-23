@@ -68,6 +68,10 @@ P0 is not one tool — it's a **stack**, and we can attack any layer:
    cracks (`ai-crack-as-a-service`) and one-line agent skill routers
    (`skill-packs`) that turn any coding agent into an RE operator.
 
+See also [`tool-call-parser-friction.md`](tool-call-parser-friction.md): an
+*accidental*, Trivial-tier anti-automation surface at the tooling layer (not a
+defense we built).
+
 **Next phase:** research + analysis on these P0 entries, highest-impact first.
 Leads: `disasm-mcp` and `agentic-re` (tooling), `uncensored-local-models`
 (because it invalidates the lazy "model refuses" assumption). Each gets its own

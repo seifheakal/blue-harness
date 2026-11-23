@@ -41,15 +41,18 @@ make harden BIN=path/to/your/binary   # apply every post-build hardening (honest
 No external dependencies: a C toolchain, `make`, and Python 3.
 
 > [!CAUTION]
-> ### 🔴 Help wanted — test blue-harness against a bigger model
-> Our before/after below is **one run (N=1)** by a small, 4-bit-quantised **7B**
-> model on a laptop (RTX 3070, 8 GB VRAM / 16 GB RAM) — a **floor, not a ceiling**.
-> If you have the hardware, point a **larger local or a frontier model** at the same
-> two builds and **send the scored result back as a PR**. A stronger attacker is the
-> only way to test the layers our small run never reached. It is now **one command** —
-> `make slice-k-run MODEL=<your-model>` builds the sealed pair, drives the agent, and
+> ### 🔴 Help wanted — test blue-harness against a stronger attacker
+> Our before/after below is **N=10 per model, two local open-weight models (80B and
+> 125B)**, on one Mac, at a **60-step budget** — a **floor, not a ceiling**, and
+> **not a wall**: each model cracked the hardened build in **1 of 10** runs. Still
+> untested: a **frontier/hosted model**, an attacker loop that **prunes its tool
+> output** (the named bypass of our exhaustion layer), and N > 10. If you have the
+> hardware or the API budget, point one at the same two builds and **send the scored
+> result back as a PR** — including the runs that did not go our way. It is now **one command** —
+> `make slice-k-run MODEL=<your-model> RUNS=3` builds the sealed pair, drives the agent, and
 > prints the honest before/after (and we fixed the tool-call friction that blocked
-> commodity local models). Five-minute guide:
+> commodity local models). No VM? On a Mac with Docker, `make slice-k-docker`
+> runs the same thing in network-less containers. Five-minute guide:
 > [**docs/HOW-WE-TESTED.md**](docs/HOW-WE-TESTED.md).
 
 ## What it is
@@ -67,20 +70,28 @@ build** and does three things, audit-first:
 - **Prove** — verify each countermeasure actually *fires*, so your protection isn't
   theater.
 
-## The measured result (one run — see the red box)
+## The measured result (N=10 per model, 60-step budget — see the red box)
 
-| build | cracked (hash-verified) | tokens | wall | steps |
-|-------|-------------------------|--------|------|-------|
-| unprotected | **YES** | 1,256 | 1.6 s | 3 |
-| hardened | **no** | 16,785 | 195 s | 13 |
+| | qwen3-coder-next 80B (q8_0) | qwen3.5 125B (Q4_K_M, thinking) |
+|---|---|---|
+| unprotected cracked (hash-verified) | 9/10 (median 9 steps, 8.1 s) | 10/10 (median 5 steps, 6.4 s) |
+| **hardened cracked** | **1/10** | **1/10** |
+| hardened cost | median 60 steps (cap), median 139 s (≥ 17×)\* | median 60 steps (cap), median 236 s (≥ 37×)\* |
+| honeytokens surfaced | 4/10 hardened runs | 6/10 hardened runs |
 
-The same agent cracked the unprotected build in under two seconds; against the
-hardened build it burned **13× the tokens and ~120× the wall-clock and still
-failed**. String encryption, anti-debug, and analysis-surface exhaustion were all
-seen firing. Honestly: the **honeytoken layer never fired** — the agent was stopped
-earlier, so that layer went untested (exactly what a bigger model would exercise).
-Method and caveats: [docs/HOW-WE-TESTED.md](docs/HOW-WE-TESTED.md) ·
-[full write-up](research/findings/2026-11-11-slice-k-empirical-run.md).
+\* **Lower bounds.** 9/10 and 8/10 hardened runs were cut off at the 60-step cap while
+still working; the agent did not give up, we stopped it. Both models attacked the same
+sealed build in a network-less Docker sandbox; a crack counts only if the recovered
+string hashes to the published digest.
+
+Honestly: this is a **speed-bump against a naive agentic loop, not a wall** — one run
+in ten got through for each model, and the 125B's crack surfaced **zero** honeytokens,
+so it left no attribution trail. The exhaustion layer's known bypass (an attacker that
+prunes or summarises tool output) was not tested. The larger model was faster on the
+easy build yet no more successful on the hardened one; at N=10 that cannot be told
+from coincidence. Method and every caveat: [docs/HOW-WE-TESTED.md](docs/HOW-WE-TESTED.md) ·
+[full write-up](research/findings/2026-11-22-slice-k-two-model-measurement.md) ·
+[the earlier N=1 run](research/findings/2026-11-11-slice-k-empirical-run.md).
 
 ## What it hardens
 
@@ -115,9 +126,9 @@ hardening — with its tier and bypass, every time.
   decoy non-mapped segment + honeytokens). All three formats auto-detected, all
   three with a post-build harden path.
 - One-command `harden`, the driving Claude skill, and a **CI gate that re-proves
-  every defense fires on each push** (362 checks green).
-- An empirical harness (digest-sealed CrackMe + honest scorer), **one measured
-  before/after run**, and a **one-command re-run** (`make slice-k-run`) with a
+  every defense fires on each push** (399 checks green in CI).
+- An empirical harness (digest-sealed CrackMe + honest scorer), a **measured
+  before/after (N=10 per model, two local models)**, and a **one-command re-run** (`make slice-k-run`) with a
   robust tool-call shim so a commodity local model can actually drive it.
 
 **Not done yet**
@@ -126,8 +137,8 @@ hardening — with its tier and bypass, every time.
   non-mapped segment + honeytokens); relink flags and string-encryption **codegen**
   still need a rebuild, and runtime checks need a Windows / Mac host to verify.
 - **Mobile app reach** — Android native libraries via JNI, iOS app internals.
-- **More measurement** — the before/after is a single run from a small local model
-  (the red box at the top).
+- **More measurement** — the before/after is N=10 per model from two local
+  open-weight models at a 60-step budget (the red box at the top).
 
 **Next, in order**
 1. More measurement against **bigger / reliably tool-calling attackers** — the
@@ -182,7 +193,7 @@ exhaustion, honeytoken poisoning) as its own, mechanism-proven countermeasures. 
 
 **Active.** All three native formats audited with magic-byte dispatch and each with
 a post-build harden path; mechanism-proven countermeasures across ELF/PE/Mach-O; a
-one-command `harden`; a CI gate with **362/362 checks green**
+one-command `harden`; a CI gate with **399/399 checks green**
 ([`make verify`](.github/workflows/verify.yml) on every push and pull
 request — the badge above is that gate); and a digest-sealed CrackMe with an honest
 empirical scorer, now driven by a **one-command re-run** (`make slice-k-run`).

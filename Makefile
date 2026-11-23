@@ -8,10 +8,12 @@
 
 BIN ?= harness/sample/sample_dev
 TARGET ?= http://127.0.0.1:11434
+RUNS ?= 1
+STEPS ?= 20
 CRACKME_BUILD := harness/crackme/build
 
 .PHONY: demo verify audit audit-pe audit-macho audit-mobile report harden harden-pe harden-macho harden-mobile harden-apk harden-ipa \
-        install-skill slice-k-run slice-k-run-mock clean help
+        install-skill slice-k-run slice-k-run-mock slice-k-docker slice-k-docker-mock clean help
 .DEFAULT_GOAL := help
 
 demo:
@@ -72,16 +74,16 @@ install-skill:
 # chosen model + hardware (see docs/workflow/slice-k-empirical-runbook.md).
 slice-k-run:
 ifeq ($(strip $(MODEL)),)
-	@echo "Usage: make slice-k-run MODEL=<model> [TARGET=http://host:11434]"
+	@echo "Usage: make slice-k-run MODEL=<model> [TARGET=http://host:11434] [RUNS=N]"
 	@echo "  Operator-gated: run INSIDE your isolated VM against your own model."
 	@echo "  No-model pipeline self-test (safe anywhere): make slice-k-run-mock"
 	@exit 2
 else
 	@echo "### build the sealed CrackMe pair"
 	@bash harness/crackme/build_crackme.sh >/dev/null
-	@echo "### drive the attacker agent (model=$(MODEL) target=$(TARGET)) and score"
+	@echo "### drive the attacker agent (model=$(MODEL) target=$(TARGET) runs=$(RUNS)) and score"
 	@python3 harness/measure/slice_k_run.py --backend ollama \
-	    --model "$(MODEL)" --target "$(TARGET)" \
+	    --model "$(MODEL)" --target "$(TARGET)" --runs "$(RUNS)" \
 	    --baseline-bin $(CRACKME_BUILD)/crackme_baseline \
 	    --hardened-bin $(CRACKME_BUILD)/crackme_hardened \
 	    --seal $(CRACKME_BUILD)/SEAL.json \
@@ -89,11 +91,26 @@ else
 	    --out-dir $(CRACKME_BUILD)
 endif
 
+# Same before/after, with a Docker sandbox instead of a VM (run ON THE HOST, e.g. a
+# Mac with Docker Desktop). Loop + model stay on the host; each agent shell command
+# runs in a fresh --network none container holding only the target binary.
+slice-k-docker:
+ifeq ($(strip $(MODEL)),)
+	@echo "Usage: make slice-k-docker MODEL=<model> [TARGET=http://127.0.0.1:11434] [RUNS=N] [STEPS=N]"
+	@echo "  Runs on the host with Docker. Plumbing check, no model: make slice-k-docker-mock"
+	@exit 2
+else
+	@bash harness/measure/docker_run.sh --model "$(MODEL)" --target "$(TARGET)" --runs "$(RUNS)" --max-steps "$(STEPS)"
+endif
+
+slice-k-docker-mock:
+	@bash harness/measure/docker_run.sh --mock --runs "$(RUNS)"
+
 # Prove the WHOLE pipeline end-to-end with a deterministic MOCK attacker — no model,
 # no network, no VM. Loudly labelled NOT A MEASUREMENT; yields no cost number.
 slice-k-run-mock:
 	@bash harness/crackme/build_crackme.sh >/dev/null
-	@python3 harness/measure/slice_k_run.py --backend mock \
+	@python3 harness/measure/slice_k_run.py --backend mock --runs "$(RUNS)" \
 	    --baseline-bin $(CRACKME_BUILD)/crackme_baseline \
 	    --hardened-bin $(CRACKME_BUILD)/crackme_hardened \
 	    --seal $(CRACKME_BUILD)/SEAL.json \
@@ -121,7 +138,8 @@ help:
 	@echo "                            segment + honeytokens (honest)"
 	@echo "  make harden-mobile BIN=<apk|aab|ipa> harden the native payloads inside + repack (you re-sign)"
 	@echo "  make install-skill        symlink the skill into .claude/skills/blue-harness"
-	@echo "  make slice-k-run MODEL=<m> [TARGET=url]  empirical before/after (OPERATOR VM; honest)"
+	@echo "  make slice-k-run MODEL=<m> [TARGET=url] [RUNS=N]  empirical before/after (OPERATOR VM; honest)"
+	@echo "  make slice-k-docker MODEL=<m> [TARGET=url] [RUNS=N]  same, Docker sandbox on the host (no VM)"
 	@echo "  make slice-k-run-mock     prove the empirical pipeline with a MOCK attacker (no model)"
 	@echo "  make clean    remove build artifacts"
 	@echo
