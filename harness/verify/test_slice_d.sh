@@ -69,12 +69,27 @@ fi
 # tamper: patch the hot-fn license compare constant (0x5AFE6A11) on disk
 cp "$ATT" "$WORK/tampered"
 python3 - "$WORK/tampered" <<'PY'
-import sys
+import sys, struct
 p=sys.argv[1]; d=bytearray(open(p,'rb').read())
-i=d.find(bytes([0x11,0x6A,0xFE,0x5A]))      # LE of the compare immediate
-assert i>=0, "hot-fn marker not found — cannot run tamper test"
-d[i]=0x12; open(p,'wb').write(d)
-print(f"    patched hot function at file offset {i}")
+# Patch the compare constant 0x5AFE6A11 -> 0x5AFE6A12 (a real crack's patch; the
+# binary still runs, so only the server can stop it). Its encoding is per-arch.
+how=None
+i=d.find(bytes([0x11,0x6A,0xFE,0x5A]))      # x86-64: contiguous LE imm32
+if i>=0:
+    d[i]=0x12; how="x86-64 imm32"
+else:
+    # AArch64: the constant is built as `movz wN,#0x6a11` + `movk wN,#0x5afe,lsl 16`.
+    # Rewrite only the imm16 field of the 32-bit MOVZ — still a valid instruction.
+    # Mask 0xFFE00000 pins sf=0 (32-bit W reg), opc=MOVZ and hw=0 (no shift), so a
+    # 64-bit `movz xN` or a shifted `movz ...,lsl 16` with the same imm16 never matches.
+    for i in range(0, len(d)-3, 4):
+        insn=struct.unpack_from('<I', d, i)[0]
+        if insn & 0xFFE00000 == 0x52800000 and (insn>>5) & 0xFFFF == 0x6A11:
+            insn=(insn & ~(0xFFFF<<5)) | (0x6A12<<5)
+            struct.pack_into('<I', d, i, insn); how="aarch64 movz imm16"; break
+assert how, "hot-fn marker not found (x86-64 or aarch64) — cannot run tamper test"
+open(p,'wb').write(d)
+print(f"    patched hot function ({how}) at file offset {i}")
 PY
 TAMP_CS="$("$WORK/tampered" checksum)"
 [ "$TAMP_CS" != "$GOOD" ] && ok "patched hot function changes the checksum ($GOOD != $TAMP_CS)" || bad "checksum did not change on patch"

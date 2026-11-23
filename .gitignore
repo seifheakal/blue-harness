@@ -41,6 +41,7 @@ harness/sample/sample_attest
 harness/sample/sample_attest_*
 harness/sample/sample_strings_enc
 harness/sample/sample_strings_plain
+harness/sample/sample_fortified_base
 harness/sample/bh_strings_gen_*.h
 # `blue-harness harden` / `apply` outputs (binary + its PRIVATE map/ledger — never commit)
 harness/sample/*.hardened

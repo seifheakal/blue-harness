@@ -56,3 +56,48 @@ jobs:
 
       - name: make verify
         run: make verify
+
+  # --------------------------------------------------------------------------
+  # ARM64 job — ENABLED 2026-11-21.
+  #
+  # The x86-64 job alone is not enough. Several tests reach into machine code
+  # (e.g. Slice D's tamper step patches an instruction's immediate) and the
+  # encoding differs per architecture: on AArch64 a 32-bit constant is split
+  # across movz/movk, so an x86-only byte search silently finds nothing. That
+  # exact bug lived on main, green in CI, until a run on Apple Silicon caught
+  # it (fixed alongside this job: "make the Slice D tamper test
+  # architecture-independent") — so this job exists to stop an arm64
+  # regression from hiding behind a green badge again.
+  #
+  # arm64 matters for Track B: Apple-Silicon dev boxes, Graviton, Raspberry Pi,
+  # and most Android/iOS native code are arm64.
+  #
+  # `ubuntu-24.04-arm` is free for public repositories; a private fork may need
+  # a paid/larger-runner plan.
+  # --------------------------------------------------------------------------
+  verify-arm64:
+    name: make verify (arm64)
+    runs-on: ubuntu-24.04-arm
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v4
+
+      - name: Record the toolchain blue-harness is being proven against
+        run: |
+          set -eux
+          uname -m
+          cc --version | head -1
+          make --version | head -1
+          python3 --version
+
+      - name: Install gdb (enables Slice A's under-tracer detection branch)
+        run: |
+          set -eux
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends gdb
+
+      - name: Allow a sibling to ptrace the baseline (Slice A control)
+        run: sudo sysctl -w kernel.yama.ptrace_scope=0 || true
+
+      - name: make verify
+        run: make verify
