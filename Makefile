@@ -8,6 +8,7 @@
 
 BIN ?= harness/sample/sample_dev
 TARGET ?= http://127.0.0.1:11434
+RUNS ?= 1
 CRACKME_BUILD := harness/crackme/build
 
 .PHONY: demo verify audit audit-pe audit-macho audit-mobile report harden harden-pe harden-macho harden-mobile harden-apk harden-ipa \
@@ -72,16 +73,16 @@ install-skill:
 # chosen model + hardware (see docs/workflow/slice-k-empirical-runbook.md).
 slice-k-run:
 ifeq ($(strip $(MODEL)),)
-	@echo "Usage: make slice-k-run MODEL=<model> [TARGET=http://host:11434]"
+	@echo "Usage: make slice-k-run MODEL=<model> [TARGET=http://host:11434] [RUNS=N]"
 	@echo "  Operator-gated: run INSIDE your isolated VM against your own model."
 	@echo "  No-model pipeline self-test (safe anywhere): make slice-k-run-mock"
 	@exit 2
 else
 	@echo "### build the sealed CrackMe pair"
 	@bash harness/crackme/build_crackme.sh >/dev/null
-	@echo "### drive the attacker agent (model=$(MODEL) target=$(TARGET)) and score"
+	@echo "### drive the attacker agent (model=$(MODEL) target=$(TARGET) runs=$(RUNS)) and score"
 	@python3 harness/measure/slice_k_run.py --backend ollama \
-	    --model "$(MODEL)" --target "$(TARGET)" \
+	    --model "$(MODEL)" --target "$(TARGET)" --runs "$(RUNS)" \
 	    --baseline-bin $(CRACKME_BUILD)/crackme_baseline \
 	    --hardened-bin $(CRACKME_BUILD)/crackme_hardened \
 	    --seal $(CRACKME_BUILD)/SEAL.json \
@@ -93,7 +94,7 @@ endif
 # no network, no VM. Loudly labelled NOT A MEASUREMENT; yields no cost number.
 slice-k-run-mock:
 	@bash harness/crackme/build_crackme.sh >/dev/null
-	@python3 harness/measure/slice_k_run.py --backend mock \
+	@python3 harness/measure/slice_k_run.py --backend mock --runs "$(RUNS)" \
 	    --baseline-bin $(CRACKME_BUILD)/crackme_baseline \
 	    --hardened-bin $(CRACKME_BUILD)/crackme_hardened \
 	    --seal $(CRACKME_BUILD)/SEAL.json \
@@ -121,7 +122,7 @@ help:
 	@echo "                            segment + honeytokens (honest)"
 	@echo "  make harden-mobile BIN=<apk|aab|ipa> harden the native payloads inside + repack (you re-sign)"
 	@echo "  make install-skill        symlink the skill into .claude/skills/blue-harness"
-	@echo "  make slice-k-run MODEL=<m> [TARGET=url]  empirical before/after (OPERATOR VM; honest)"
+	@echo "  make slice-k-run MODEL=<m> [TARGET=url] [RUNS=N]  empirical before/after (OPERATOR VM; honest)"
 	@echo "  make slice-k-run-mock     prove the empirical pipeline with a MOCK attacker (no model)"
 	@echo "  make clean    remove build artifacts"
 	@echo

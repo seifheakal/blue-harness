@@ -18,7 +18,12 @@
 #     (D) HONESTY guardrails fire: the output is loudly marked NOT A MEASUREMENT,
 #         no cost multiplier is fabricated, and the real-run gating is stated;
 #     (E) the LIVE operator path (Ollama / a reliably-tool-calling model) is wired,
-#         proven statically via --dry-run (contacts nothing).
+#         proven statically via --dry-run (contacts nothing);
+#     (F) ISOLATION: the attacker's shell never sees BH_CRACKME_SECRET (scrubbed,
+#         allowlisted env) and starts in a private arena holding ONLY its binary —
+#         SEAL.json and the private honey-ledger are not reachable from its cwd;
+#     (G) REPEATS: --runs N writes each before/after to its own run-NN/ dir (no
+#         overwrite) plus a counts-only summary.json.
 #
 #   It does NOT produce an effectiveness number — that needs the operator's isolated
 #   VM + chosen model + hardware (same gating as the Slice K VM note). We never
@@ -170,9 +175,18 @@ import json,sys
 r=json.load(open(sys.argv[1]))
 sys.exit(0 if r.get("measurement_grade")=="mock" and r.get("tokens") is None and r.get("wall_clock_s") is None else 1)
 PY4
+    "$PY" "$MEASURE/slice_k_run.py" --backend mock --json \
+        --baseline-bin "$BASE" --hardened-bin "$HARD" \
+        --seal "$SEAL" --ledger "$LEDGER" --out-dir "$WORK/out_json" \
+        > "$WORK/json.out" 2> "$WORK/json.err" \
+        && "$PY" -c 'import json,sys; json.load(open(sys.argv[1]))' "$WORK/json.out" \
+        && grep -q "NOT A MEASUREMENT" "$WORK/json.err" \
+        && ok "--json: stdout is pure JSON; the NOT A MEASUREMENT banner moves to stderr" \
+        || bad "--json stdout is not parseable JSON, or the banner was dropped"
 else
     skip "(D) NOT-A-MEASUREMENT mark — build-gated"; skip "(D) no fabricated multiplier — build-gated"
     skip "(D) real-run gating — build-gated"; skip "(D) honest run-JSON stamp — build-gated"
+    skip "(D) --json stays parseable — build-gated"
 fi
 
 # --------------------------------------------------------------------------- #
@@ -186,6 +200,98 @@ grep -q "require the operator's isolated VM" "$WORK/dry.txt" \
     && ok "dry-run states the real run is operator-VM-gated" || bad "no gating note in dry-run"
 MEASURE="$MEASURE" "$PY" -c "import os,sys;sys.path.insert(0,os.environ['MEASURE']);import attacker_agent as a;sys.exit(0 if hasattr(a,'OllamaBackend') and a.OllamaBackend.grade=='live' else 1)" \
     && ok "OllamaBackend present (live grade; prefers native tool_calls)" || bad "OllamaBackend missing"
+
+# --------------------------------------------------------------------------- #
+hdr "(F) ISOLATION — no flag in the agent env, no seal/ledger in its arena"
+cat > "$WORK/iso_test.py" <<'PYEOF'
+import os, sys, stat
+sys.path.insert(0, os.environ["MEASURE"])
+import attacker_agent as aa
+import slice_k_run as skr
+
+SECRET = "CARA{iso-probe-not-a-real-secret}"
+os.environ["BH_CRACKME_SECRET"] = SECRET
+os.environ["BH_SOME_TOKEN"] = "tok-should-not-leak"
+
+def case(desc, cond):
+    print(("PASS " if cond else "FAIL ") + desc)
+
+env = aa.agent_env("/tmp/x")
+case("agent_env drops BH_CRACKME_SECRET", "BH_CRACKME_SECRET" not in env)
+case("agent_env is an allowlist (unknown vars dropped)", "BH_SOME_TOKEN" not in env)
+case("agent_env points HOME at the arena", env.get("HOME") == "/tmp/x")
+r = aa.run_shell("env")
+case("run_shell default env hides the flag even when exported", SECRET not in r["output"])
+
+# a fake build dir: binary + seal + PRIVATE ledger side by side (as build/ is)
+build = os.path.join(os.environ["WORK"], "fakebuild")
+os.makedirs(build)
+for n in ("crackme_hardened", "SEAL.json", "crackme_hardened.honey-ledger.json"):
+    open(os.path.join(build, n), "w").write("x")
+arena, staged = skr._stage_arena(os.path.join(build, "crackme_hardened"),
+                                 os.environ["WORK"])
+case("arena holds ONLY the staged binary", os.listdir(arena) == ["crackme_hardened"])
+case("arena is private (0700)", stat.S_IMODE(os.stat(arena).st_mode) == 0o700)
+
+class Probe:
+    """Scripted brain that does what a curious strong model would: dump env, list
+    the cwd and home. The loop runs these for real inside the arena."""
+    grade = "mock"
+    def __init__(self): self.n = 0
+    def chat(self, messages, tools=None):
+        self.n += 1
+        if self.n == 1:
+            return {"content": '{"name":"shell","arguments":{"command":"env; ls -A; ls -A ~"}}',
+                    "tool_calls": None, "usage": None}
+        return {"content": "FLAG=none", "tool_calls": None, "usage": None}
+
+rec = aa.run_agent(Probe(), staged, cwd=arena, env=aa.agent_env(arena), max_steps=3)
+t = rec["transcript"]
+case("probe agent: flag absent from its env dump", SECRET not in t)
+case("probe agent: ledger not visible from its cwd/home", "honey-ledger" not in t)
+case("probe agent: SEAL.json not visible from its cwd/home", "SEAL.json" not in t)
+case("probe agent: it did see its own binary", "crackme_hardened" in t)
+PYEOF
+MEASURE="$MEASURE" WORK="$WORK" "$PY" "$WORK/iso_test.py" > "$WORK/iso.out" 2>&1 || true
+if grep -q Traceback "$WORK/iso.out"; then
+    bad "isolation test crashed"; sed 's/^/      /' "$WORK/iso.out"
+else
+    while IFS= read -r line; do
+        case "$line" in
+            PASS\ *) ok "${line#PASS }";;
+            FAIL\ *) bad "${line#FAIL }";;
+        esac
+    done < "$WORK/iso.out"
+fi
+
+# --------------------------------------------------------------------------- #
+hdr "(G) REPEATS — --runs 2 keeps every run's artifacts"
+if [ "$BUILT" = 1 ]; then
+    OUT2="$WORK/out2"
+    BH_CRACKME_SECRET="$FLAG" "$PY" "$MEASURE/slice_k_run.py" --backend mock --runs 2 \
+        --baseline-bin "$BASE" --hardened-bin "$HARD" \
+        --seal "$SEAL" --ledger "$LEDGER" --out-dir "$OUT2" > "$WORK/report2.txt" 2>&1 \
+        && ok "--runs 2 completed" \
+        || { bad "--runs 2 failed"; sed 's/^/      /' "$WORK/report2.txt"; }
+    for i in 01 02; do
+        [ -f "$OUT2/run-$i/run_baseline.json" ] && [ -f "$OUT2/run-$i/run_hardened.json" ] \
+            && [ -f "$OUT2/run-$i/report.json" ] \
+            && ok "run-$i/ has its own run_*.json + report.json" || bad "run-$i artifacts missing"
+    done
+    [ -f "$OUT2/summary.json" ] && grep -q "SUMMARY across 2 runs" "$WORK/report2.txt" \
+        && ok "summary.json written + summary printed" || bad "no multi-run summary"
+    grep -q "baseline cracked ............ 2/2" "$WORK/report2.txt" \
+        && grep -q "hardened cracked ............ 0/2" "$WORK/report2.txt" \
+        && ok "summary counts: baseline 2/2, hardened 0/2 (verified vs the seal)" \
+        || bad "wrong summary counts"
+    ! grep -q "$FLAG" "$OUT2/run-01/transcript_hardened.txt" \
+        && ok "hardened transcript never contains the real flag (env scrubbed)" \
+        || bad "real flag leaked into the hardened transcript"
+else
+    skip "(G) --runs 2 — build-gated"; skip "(G) run-01 — build-gated"
+    skip "(G) run-02 — build-gated"; skip "(G) summary — build-gated"
+    skip "(G) summary counts — build-gated"; skip "(G) no flag leak — build-gated"
+fi
 
 rm -rf "$BD"   # keep the tree clean
 

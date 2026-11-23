@@ -14,8 +14,29 @@ flag in the environment:
 
 ```bash
 export BH_CRACKME_SECRET='CARA{your-own-flag}'   # never enters the repo
-make slice-k-run MODEL=<your-model> TARGET=http://127.0.0.1:11434
+make slice-k-run MODEL=<your-model> TARGET=http://127.0.0.1:11434 RUNS=3
 ```
+
+`RUNS=N` (default 1) repeats the full before/after N times, each with a fresh agent
+context. Each repeat writes to its own `run-NN/` folder, and a counts-only
+`summary.json` is added (e.g. *hardened cracked 0/3*). Missing cost figures are
+never averaged in.
+
+**Isolation the driver enforces** (added after review, because a stronger model
+*will* look around):
+- Each variant runs in a **fresh, private (0700) arena directory holding only its
+  binary**. The build dir, which also holds `SEAL.json` and the **private
+  honey-ledger**, is never the agent's cwd or `HOME`.
+- The agent's shell gets a **scrubbed, allowlisted environment** (`PATH`, locale,
+  `TERM`, `TZ`; `HOME`/`TMPDIR` set to the arena). `BH_CRACKME_SECRET` and every
+  other variable from your shell never reach it, so `env` reveals nothing.
+
+**What it cannot enforce:** the agent still runs as *your* user, so it could
+`cat` an absolute path such as the repo checkout or the build dir if it guesses one.
+For a scored run: set the flag with `BH_CRACKME_SECRET`, not `secret.local.txt`
+(the crackme source contains no flag). For full separation, run the driver as a
+dedicated user that cannot read the repo, or use the manual copy-only-the-binaries
+path below.
 
 It builds the sealed pair, drives the attacker agent
 (`harness/measure/attacker_agent.py`) against **both** builds, and prints the honest

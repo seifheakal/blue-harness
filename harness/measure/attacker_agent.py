@@ -26,6 +26,7 @@
 #   does NOT download, serve, or bundle any model; OllamaBackend only POSTs to an
 #   endpoint the operator points it at. CI exercises the MockBackend only.
 
+import os
 import json
 import time
 import shlex
@@ -216,11 +217,33 @@ def extract_final_answer(assistant_message):
 # --------------------------------------------------------------------------- #
 #  THE SHELL TOOL — a real executor (the attacker's hands).
 # --------------------------------------------------------------------------- #
-def run_shell(command, cwd=None, timeout=60, max_output=8192):
+# Only these variables reach the attacker's shell. An ALLOWLIST, not a denylist:
+# the operator's environment carries BH_CRACKME_SECRET (the flag the build was made
+# from) and may carry tokens/keys we cannot predict, so nothing else is inherited.
+_ENV_ALLOW = ("PATH", "LANG", "LC_ALL", "LC_CTYPE", "TERM", "TZ")
+
+
+def agent_env(home=None, base=None):
+    """The scrubbed environment the attacker's shell runs under. HOME is pointed
+    at the agent's arena (when given) so `~` does not lead to the operator's own
+    home. Never contains BH_CRACKME_SECRET or anything else not allowlisted."""
+    base = os.environ if base is None else base
+    env = {k: base[k] for k in _ENV_ALLOW if k in base}
+    env.setdefault("PATH", "/usr/local/bin:/usr/bin:/bin")
+    if home:
+        env["HOME"] = home
+        env["TMPDIR"] = home
+    return env
+
+
+def run_shell(command, cwd=None, timeout=60, max_output=8192, env=None):
     """Execute one shell command, truncate output, never raise. Mirrors the
-    2026-11-11 custom loop (60 s/step cap, 8 KB output cap)."""
+    2026-11-11 custom loop (60 s/step cap, 8 KB output cap). The command runs
+    under `env` (default: agent_env(cwd)) — never the operator's environment."""
+    if env is None:
+        env = agent_env(cwd)
     try:
-        r = subprocess.run(command, shell=True, cwd=cwd, timeout=timeout,
+        r = subprocess.run(command, shell=True, cwd=cwd, timeout=timeout, env=env,
                            capture_output=True, text=True, errors="replace")
         out = (r.stdout or "") + (("\n[stderr]\n" + r.stderr) if r.stderr else "")
         rc = r.returncode
@@ -347,7 +370,7 @@ _TOOL_SPEC = [{
 
 
 def run_agent(backend, binary, task=DEFAULT_TASK, cwd=None, max_steps=20,
-              step_timeout=60, max_output=8192):
+              step_timeout=60, max_output=8192, env=None):
     """Drive `backend` against `binary` and return a recorded run.
 
     Returns {recovered_secret, tokens, wall_clock_s, steps, transcript,
@@ -375,7 +398,7 @@ def run_agent(backend, binary, task=DEFAULT_TASK, cwd=None, max_steps=20,
         if calls:
             for call in calls:
                 res = run_shell(call["command"], cwd=cwd, timeout=step_timeout,
-                                max_output=max_output)
+                                max_output=max_output, env=env)
                 messages.append({"role": "tool",
                                  "content": f"$ {call['command']}\n{res['output']}"})
             continue
